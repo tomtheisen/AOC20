@@ -1,4 +1,5 @@
 <Query Kind="Program">
+  <Namespace>static System.Math</Namespace>
   <Namespace>System.Diagnostics.CodeAnalysis</Namespace>
   <Namespace>System.Numerics</Namespace>
 </Query>
@@ -20,20 +21,15 @@ void Main() {
 	maze.Dump();
 	var start = maze.Find("@").Dump("start");
 	
-	// TODO
-	// BreadthFirst.Create(start, Direction.Cardinal)
-	var path = DepthFirst.Create(start, Direction.Cardinal)
+	var path = BreadthFirst.Create(start, Direction.Cardinal)
 		.SetGoal(pos => maze[pos] == '!')
-		.SetTransition((pos, move) => pos.Move(move))
+		.SetTransition((pos, move) => pos + move)
 		.AddStateFilter(maze.Contains)
 		.AddStateFilter(pos => maze[pos] != 'X')
 		.DetectLoops()
 		.Search();
 		
-	foreach (var step in path!) {
-		start = start.Move(step);
-		maze = maze.With(start, '.');
-	}
+	foreach (var step in path!) maze = maze.With(start = start + step, '.');
 	maze.Dump();
 }
 
@@ -46,20 +42,24 @@ struct Direction : IEquatable<Direction> {
 	public override int GetHashCode() => (int)BitOperations.RotateRight((uint)DX, 16) ^ DY;
 	public bool Equals(Direction other) => other.DX == DX && other.DY == DY;
 
-	public static Direction Up = new Direction(0, -1);
-	public static Direction Right = new Direction(1, 0);
-	public static Direction Down = new Direction(0, 1);
-	public static Direction Left = new Direction(-1, 0);
-	public static Direction[] Cardinal = { Up, Right, Down, Left };
+	public static Direction N = new Direction(0, -1), E = new Direction(1, 0), S = new Direction(0, 1), W = new Direction(-1, 0);
+	public static Direction[] Cardinal = { N, E, S, W };
+	public static Direction NW = N + W, NE = N + E, SW = S + W, SE = S + E;
+	public static Direction[] InterCardinal = { N, NE, E, SE, S, SW, W, NW };
 
 	public Direction CW() => new Direction(-DY, DX);
 	public Direction CCW() => new Direction(DY, -DX);
 	public Direction Reverse() => new Direction(-DX, -DY);
 
+	public int Manhattan() => Abs(DX) + Abs(DY);
+	public int SquareDistance() => Max(Abs(DX), Abs(DY));
+
 	public override string ToString() => $"d({DX},{DY})";
 	public string ToDump() => ToString();
 	
 	public void Deconstruct(out int dx, out int dy) => (dx, dy) = (DX, DY);
+	
+	public static Direction operator +(Direction a, Direction b) => new Direction(a.DX + b.DX, a.DY + b.DY);
 }
 
 struct Position : IEquatable<Position> {
@@ -77,27 +77,32 @@ struct Position : IEquatable<Position> {
 		=> other.X == X && other.Y == Y && other.Face.Equals(Face);
 
 	public Position Step() => new Position(X + Face.DX, Y + Face.DY, Face);
-	public Position Move(Direction move) => new Position(X + move.DX, Y + move.DY, Face);
-	public Position Up() => this.Move(Direction.Up);
-	public Position Right() => this.Move(Direction.Right);
-	public Position Down() => this.Move(Direction.Down);
-	public Position Left() => this.Move(Direction.Left);
+	public Position Up() => this + Direction.N;
+	public Position Right() => this + Direction.E;
+	public Position Down() => this + Direction.S;
+	public Position Left() => this + Direction.W;
 
 	public Position FaceTo(Direction face) => new Position(X, Y, face);
 	public Position CW() => this.FaceTo(Face.CW());
 	public Position CCW() => this.FaceTo(Face.CCW());
 	public Position Reverse() => this.FaceTo(Face.Reverse());
 
-	public override string ToString() => $"({X}, {Y})";
-	public string ToDump() => ToString();
+	public static Direction operator -(Position a, Position b) => new Direction(a.X - b.X, a.Y - b.Y);
+	public static Position operator +(Position p, Direction d) => new Position(p.X + d.DX, p.Y + d.DY, p.Face);
+
+	public int Manhattan(Position other) => (this - other).Manhattan();
+	public int SquareDistance(Position other) => (this - other).SquareDistance();
 
 	public void Deconstruct(out int x, out int y) => (x, y) = (X, Y);
 	public void Deconstruct(out int x, out int y, out Direction face) => (x, y, face) = (X, Y, Face);
 
-	public Position[] Neighbors() {
+	public Position[] Adjacent() {
 		var self = this;
-		return Array.ConvertAll(Direction.Cardinal, d => self.Move(d));
+		return Array.ConvertAll(Direction.Cardinal, d => self + d);
 	}
+	
+	public override string ToString() => $"({X}, {Y})";
+	public string ToDump() => ToString();
 }
 
 class Board : IEnumerable<Position> {
@@ -194,6 +199,8 @@ public class History<T> : IEnumerable<T> {
 	}
 
 	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
+
+	public override string ToString() => string.Join(' ', this);
 }
 
 public delegate IEnumerable<(TState, TTransition)> StateTransition<TState, TTransition>(TState state);
@@ -291,7 +298,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			var (state, history) = element;
 			if (Goal(state)) return history;
 
-			if (Seen?.Contains(state) == true) return null;
+			if (Seen?.Contains(state) == true) continue;
 			Seen?.Add(state);
 			if (DumpContainer is object) DumpContainer.Content = state;
 			
