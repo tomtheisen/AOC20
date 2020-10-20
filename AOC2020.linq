@@ -21,7 +21,7 @@ void Main() {
 	maze.Dump();
 	var start = maze.Find("@").Dump("start");
 	
-	var path = BreadthFirst.Create(start, Direction.Cardinal)
+	var path = DepthFirst.Create(start, Direction.Cardinal)
 		.SetGoal(pos => maze[pos] == '!')
 		.SetTransition((pos, move) => pos + move)
 		.AddStateFilter(maze.Contains)
@@ -31,6 +31,12 @@ void Main() {
 		
 	foreach (var step in path!) maze = maze.With(start = start + step, '.');
 	maze.Dump();
+	
+	var binary = BreadthFirst.Create(0, new[] {0,1})
+		.SetGoal(12345.Equals)
+		.SetTransition((val, bit) => 2 * val + bit)
+		.Search();
+	string.Concat(binary).Dump();
 }
 
 struct Direction : IEquatable<Direction> {
