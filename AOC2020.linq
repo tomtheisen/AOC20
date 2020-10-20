@@ -20,6 +20,8 @@ void Main() {
 	maze.Dump();
 	var start = maze.Find("@").Dump("start");
 	
+	// TODO
+	// BreadthFirst.Create(start, Direction.Cardinal)
 	var path = DepthFirst.Create(start, Direction.Cardinal)
 		.SetGoal(pos => maze[pos] == '!')
 		.SetTransition((pos, move) => pos.Move(move))
@@ -181,7 +183,7 @@ public class History<T> : IEnumerable<T> {
 		Last = last;
 	}
 	
-	public static History<T> Empty { get; } = new History<T>
+	public static History<T> Empty { get; } = new History<T>();
 	
 	public History<T> AndThen(T state) => new History<T>(this, state);
 
@@ -196,12 +198,7 @@ public class History<T> : IEnumerable<T> {
 
 public delegate IEnumerable<(TState, TTransition)> StateTransition<TState, TTransition>(TState state);
 
-public static class DepthFirst {
-	public static DepthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
-		=> new DepthFirst<TState, TAct>(start, acts);
-}
-
-public class DepthFirst<TState, TAct> {
+public abstract class SearchBase<TState, TAct> {
 	public Predicate<TState> Goal { get; set; }
 	public IList<TAct> Acts { get; set; }
 	public List<Func<TState, TAct, bool>> ActFilters { get; } = new List<Func<TState, TAct, bool>>();
@@ -211,44 +208,55 @@ public class DepthFirst<TState, TAct> {
 	public TState Start { get; set; }
 	public DumpContainer? DumpContainer { get; set; }
 
-	public DepthFirst(TState start, IList<TAct> acts) {
+	public SearchBase(TState start, IList<TAct> acts) {
 		this.Start = start;
 		this.Acts = acts;
 		this.Goal = _ => true;
 		this.Transition = (_, _) => throw new Exception("Transition not specified");
 	}
 	
-	public DepthFirst<TState, TAct> AddActFilter(Func<TState, TAct, bool> legalAct) {
+	public SearchBase<TState, TAct> AddActFilter(Func<TState, TAct, bool> legalAct) {
 		this.ActFilters.Add(legalAct);
 		return this;
 	}
 	
-	public DepthFirst<TState, TAct> AddStateFilter(Predicate<TState> legalState) {
+	public SearchBase<TState, TAct> AddStateFilter(Predicate<TState> legalState) {
 		this.StateFilters.Add(legalState);
 		return this;
 	}
 	
-	public DepthFirst<TState, TAct> SetGoal(Predicate<TState> goal) {
+	public SearchBase<TState, TAct> SetGoal(Predicate<TState> goal) {
 		this.Goal = goal;
 		return this;
 	}
 	
-	public DepthFirst<TState, TAct> SetTransition(Func<TState, TAct, TState> transition) {
+	public SearchBase<TState, TAct> SetTransition(Func<TState, TAct, TState> transition) {
 		this.Transition = transition;
 		return this;
 	}
 	
-	public DepthFirst<TState, TAct> DetectLoops() {
+	public SearchBase<TState, TAct> DetectLoops() {
 		this.Seen = new HashSet<TState>();
 		return this;
 	}
 
-	public DepthFirst<TState, TAct> SetDumpContainer(DumpContainer dumpContainer) {
+	public SearchBase<TState, TAct> SetDumpContainer(DumpContainer dumpContainer) {
 		this.DumpContainer = dumpContainer;
 		return this;
 	}
+	
+	public abstract IEnumerable<TAct>? Search();
+}
 
-	public IEnumerable<TAct>? Search() => Search(Start, new History<TAct>());
+public static class DepthFirst {
+	public static DepthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
+		=> new DepthFirst<TState, TAct>(start, acts);
+}
+
+public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
+	public DepthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
+	
+	public override IEnumerable<TAct>? Search() => Search(Start, new History<TAct>());
 	
 	public IEnumerable<TAct>? Search(TState state, History<TAct> history) {
 		if (Goal(state)) return history;
@@ -264,6 +272,38 @@ public class DepthFirst<TState, TAct> {
 			var newHistory = history.AndThen(act);
 			if (Search(newState, newHistory) is IEnumerable<TAct> result) return result;
 		}
+		return null;
+	}
+}
+
+public static class BreadthFirst {
+	public static BreadthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
+		=> new BreadthFirst<TState, TAct>(start, acts);
+}
+
+public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
+	public BreadthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
+	
+	public override IEnumerable<TAct>? Search() {
+		var queue = new Queue<(TState, History<TAct>)>();
+		
+		for (queue.Enqueue((Start, History<TAct>.Empty)); queue.TryDequeue(out var element); ) {
+			var (state, history) = element;
+			if (Goal(state)) return history;
+
+			if (Seen?.Contains(state) == true) return null;
+			Seen?.Add(state);
+			if (DumpContainer is object) DumpContainer.Content = state;
+			
+			foreach (var act in Acts) {
+				if (ActFilters.Any(af => !af(state, act))) continue;
+				var newState = Transition(state, act);
+				if (StateFilters.Any(sf => !sf(newState))) continue;
+				var newHistory = history.AndThen(act);
+				queue.Enqueue((newState, newHistory));
+			}
+		}
+		
 		return null;
 	}
 }
