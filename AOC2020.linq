@@ -89,6 +89,7 @@ struct Position : IEquatable<Position> {
 
 	public static Direction operator -(Position a, Position b) => new Direction(a.X - b.X, a.Y - b.Y);
 	public static Position operator +(Position p, Direction d) => new Position(p.X + d.DX, p.Y + d.DY, p.Face);
+	public Position Move(Direction d) => this + d;
 
 	public int Manhattan(Position other) => (this - other).Manhattan();
 	public int SquareDistance(Position other) => (this - other).SquareDistance();
@@ -96,10 +97,8 @@ struct Position : IEquatable<Position> {
 	public void Deconstruct(out int x, out int y) => (x, y) = (X, Y);
 	public void Deconstruct(out int x, out int y, out Direction face) => (x, y, face) = (X, Y, Face);
 
-	public Position[] Adjacent() {
-		var self = this;
-		return Array.ConvertAll(Direction.Cardinal, d => self + d);
-	}
+	public Position[] Adjacent() => Array.ConvertAll(Direction.Cardinal, Move);
+	public Position[] Neighbors() => Array.ConvertAll(Direction.InterCardinal, Move);
 	
 	public override string ToString() => $"({X}, {Y})";
 	public string ToDump() => ToString();
@@ -122,11 +121,8 @@ class Board : IEnumerable<Position> {
 		Width = lines.Max(l => l.Length);
 		_Cells = new char[Width, Height];
 		
-		for (int y = 0; y < Height; y++) {
-			for (int x = 0; x < lines[y].Length; x++) {
-				_Cells[x, y] = lines[y][x];
-			}
-		}
+		for (int y = 0; y < Height; y++)
+			for (int x = 0; x < lines[y].Length; x++) _Cells[x, y] = lines[y][x];
 	}
 	
 	public char this[int x, int y] => _Cells[x, y];
@@ -143,11 +139,9 @@ class Board : IEnumerable<Position> {
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
 
 	public IEnumerator<Position> GetEnumerator() {
-		for (int x = 0; x < this.Width; x++) {
-			for (int y = 0; y < this.Height; y++) {
+		for (int x = 0; x < this.Width; x++)
+			for (int y = 0; y < this.Height; y++)
 				yield return new Position(x, y);
-			}
-		}
 	}
 
 	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
@@ -157,38 +151,22 @@ class Board : IEnumerable<Position> {
 	
 	public string ToDump() {
 		var sb = new StringBuilder();
-		for (int y = 0; y < this.Height; y++) {
-			for (int x = 0; x < this.Width; x++) {
-				sb.Append(this[x, y]);
-			}
-			sb.Append('\n');
-		}
+		for (int y = 0; y < this.Height; y++, sb.Append('\n'))
+			for (int x = 0; x < this.Width; x++) sb.Append(this[x, y]);
 		return sb.ToString();
 	}
 }
 
 public class History<T> : IEnumerable<T> {
+	public static History<T> Empty { get; } = new History<T>();
+	
 	public readonly T Last;
 	public readonly History<T> Prefix;
 	private readonly bool IsEmpty;
 	
-	public History() {
-		IsEmpty = true;
-		Prefix = this;
-		Last = default!;
-	}
-	
-	public History(T start) {
-		Prefix = new History<T>();
-		Last = start;
-	}
-	
-	public History(History<T> prefix, T last) {
-		Prefix = prefix;
-		Last = last;
-	}
-	
-	public static History<T> Empty { get; } = new History<T>();
+	public History() => (IsEmpty, Prefix, Last) = (true, this, default!);
+	public History(T start) => (Prefix, Last) = (new History<T>(), start);
+	public History(History<T> prefix, T last) => (Prefix, Last) = (prefix, last);
 	
 	public History<T> AndThen(T state) => new History<T>(this, state);
 
