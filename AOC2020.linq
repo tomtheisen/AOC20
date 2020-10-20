@@ -3,8 +3,6 @@
   <Namespace>System.Numerics</Namespace>
 </Query>
 
-#nullable enable
-
 void Main() {
 	var maze = new Board(@"
 		XXXXXXXXXXXXXXXX
@@ -20,21 +18,19 @@ void Main() {
 		XXXXXXXXXXXXXXXX"[2..]);
 		
 	maze.Dump();
-	var pos = maze.Find("@").Dump();
-	maze[pos].Dump();
+	var start = maze.Find("@").Dump("start");
 	
-	maze.Find("!").Dump();
-	
-	var path = DFS(pos, 
-		s => maze[s] == '!', 
-		s => Direction.Cardinal
-			.Select(d => (s.Move(d), d))
-			.Where(d => maze[d.Item1] != 'X'), 
-		detectLoops: true).Dump();
+	var path = DepthFirst.Create(start, Direction.Cardinal)
+		.SetGoal(pos => maze[pos] == '!')
+		.SetTransition((pos, move) => pos.Move(move))
+		.AddStateFilter(maze.Contains)
+		.AddStateFilter(pos => maze[pos] != 'X')
+		.DetectLoops()
+		.Search();
 		
 	foreach (var step in path!) {
-		pos = pos.Move(step);
-		maze = maze.With(pos, '.');
+		start = start.Move(step);
+		maze = maze.With(start, '.');
 	}
 	maze.Dump();
 }
@@ -152,7 +148,6 @@ class Board : IEnumerable<Position> {
 	public IEnumerable<Position> FindAll(string needles) => this.Where(t => needles.Contains(this[t]));
 	public Position Find(string needles) => this.First(t => needles.Contains(this[t]));
 	
-
 	public string ToDump() {
 		var sb = new StringBuilder();
 		for (int y = 0; y < this.Height; y++) {
@@ -168,16 +163,12 @@ class Board : IEnumerable<Position> {
 public class History<T> : IEnumerable<T> {
 	public readonly T Last;
 	public readonly History<T> Prefix;
-	private readonly bool Empty;
-	
-	public History(History<T> prefix, T last) {
-		Prefix = prefix;
-		Last = last;
-	}
+	private readonly bool IsEmpty;
 	
 	public History() {
-		Empty = true;
+		IsEmpty = true;
 		Prefix = this;
+		Last = default!;
 	}
 	
 	public History(T start) {
@@ -185,10 +176,17 @@ public class History<T> : IEnumerable<T> {
 		Last = start;
 	}
 	
+	public History(History<T> prefix, T last) {
+		Prefix = prefix;
+		Last = last;
+	}
+	
+	public static History<T> Empty { get; } = new History<T>
+	
 	public History<T> AndThen(T state) => new History<T>(this, state);
 
 	public IEnumerator<T> GetEnumerator() {
-		if (Empty) yield break;
+		if (IsEmpty) yield break;
 		foreach (var element in Prefix) yield return element;
 		yield return Last;
 	}
@@ -198,44 +196,74 @@ public class History<T> : IEnumerable<T> {
 
 public delegate IEnumerable<(TState, TTransition)> StateTransition<TState, TTransition>(TState state);
 
-public IEnumerable<THistory>? DFS<TState, THistory>(TState start, Predicate<TState> goal, StateTransition<TState, THistory> next, bool detectLoops = false)
-	=> DFS(start, goal, next, detectLoops ? new HashSet<TState>() : null, new History<THistory>());
-	
-public IEnumerable<THistory>? DFS<TState, THistory>(TState start, Predicate<TState> goal, StateTransition<TState, THistory> next, HashSet<TState>? seen, History<THistory> history) {
-	if (goal(start)) 
-		return history;
-	
-	if (seen?.Contains(start) == true) return null;
-	seen?.Add(start);
-	
-	foreach (var (state, transition) in next(start)) {
-		if (DFS(state, goal, next, seen, history.AndThen(transition)) is IEnumerable<THistory> result) return result;
-	}
-	return null;
+public static class DepthFirst {
+	public static DepthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
+		=> new DepthFirst<TState, TAct>(start, acts);
 }
 
-public class DepthFirst {
-	public int MyProperty { get; set; }
-}
+public class DepthFirst<TState, TAct> {
+	public Predicate<TState> Goal { get; set; }
+	public IList<TAct> Acts { get; set; }
+	public List<Func<TState, TAct, bool>> ActFilters { get; } = new List<Func<TState, TAct, bool>>();
+	public List<Predicate<TState>> StateFilters { get; } = new List<Predicate<TState>>();
+	public Func<TState, TAct, TState> Transition { get; set; }
+	public HashSet<TState>? Seen { get; set; }
+	public TState Start { get; set; }
+	public DumpContainer? DumpContainer { get; set; }
 
-public IEnumerable<THistory>? BFS<TState, THistory>(TState start, Predicate<TState> goal, StateTransition<TState, THistory> next, bool detectLoops = false) {
-	var seen = new HashSet<TState>();
-	var queue = new Queue<(TState state, History<THistory> history)>();
-	
-	for(queue.Enqueue((start, new History<THistory>())); queue.Count > 0;) {
-		var (state, history) = queue.Dequeue();
-		
-		if (goal(state)) return history;
-		
-		if (detectLoops) {
-			if (seen.Contains(state)) continue;
-			seen.Add(state);
-		}
-		
-		foreach (var (successor, transition) in next(state)) {
-			queue.Enqueue((successor, history.AndThen(transition)));
-		}
+	public DepthFirst(TState start, IList<TAct> acts) {
+		this.Start = start;
+		this.Acts = acts;
+		this.Goal = _ => true;
+		this.Transition = (_, _) => throw new Exception("Transition not specified");
 	}
 	
-	return null;
+	public DepthFirst<TState, TAct> AddActFilter(Func<TState, TAct, bool> legalAct) {
+		this.ActFilters.Add(legalAct);
+		return this;
+	}
+	
+	public DepthFirst<TState, TAct> AddStateFilter(Predicate<TState> legalState) {
+		this.StateFilters.Add(legalState);
+		return this;
+	}
+	
+	public DepthFirst<TState, TAct> SetGoal(Predicate<TState> goal) {
+		this.Goal = goal;
+		return this;
+	}
+	
+	public DepthFirst<TState, TAct> SetTransition(Func<TState, TAct, TState> transition) {
+		this.Transition = transition;
+		return this;
+	}
+	
+	public DepthFirst<TState, TAct> DetectLoops() {
+		this.Seen = new HashSet<TState>();
+		return this;
+	}
+
+	public DepthFirst<TState, TAct> SetDumpContainer(DumpContainer dumpContainer) {
+		this.DumpContainer = dumpContainer;
+		return this;
+	}
+
+	public IEnumerable<TAct>? Search() => Search(Start, new History<TAct>());
+	
+	public IEnumerable<TAct>? Search(TState state, History<TAct> history) {
+		if (Goal(state)) return history;
+		
+		if (Seen?.Contains(state) == true) return null;
+		Seen?.Add(state);
+		if (DumpContainer is object) DumpContainer.Content = state;
+		
+		foreach (var act in Acts) {
+			if (ActFilters.Any(af => !af(state, act))) continue;
+			var newState = Transition(state, act);
+			if (StateFilters.Any(sf => !sf(newState))) continue;
+			var newHistory = history.AndThen(act);
+			if (Search(newState, newHistory) is IEnumerable<TAct> result) return result;
+		}
+		return null;
+	}
 }
