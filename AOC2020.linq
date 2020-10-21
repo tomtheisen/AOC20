@@ -407,27 +407,27 @@ public class PriorityQueue<T> {
 	}
 }
 
-string ReadString() {
+static string ReadString() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return File.ReadAllText(filename);
 }
 
-string[] ReadLines() {
+static string[] ReadLines() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return File.ReadAllLines(filename);
 }
 
-int[] ReadInts() {
+static int[] ReadInts() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return File.ReadLines(filename).Select(int.Parse).ToArray();
 }
 
-long[] ReadLongs() {
+static long[] ReadLongs() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return File.ReadLines(filename).Select(long.Parse).ToArray();
 }
 
-Board ReadBoard() {
+static Board ReadBoard() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return new Board(File.ReadAllText(filename));
 }

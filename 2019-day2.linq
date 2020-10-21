@@ -1,46 +1,29 @@
-<Query Kind="Statements" />
+<Query Kind="Statements">
+  <Namespace>static System.Console</Namespace>
+</Query>
 
 #load ".\AOC2020"
+#load ".\IntCode"
 
-void Run(int[] mem) {
-	int ip = 0;
-	bool running = true;
-	while (running) { 
-		switch (mem[ip]) {
-			case 1:
-				mem[mem[ip + 3]] = mem[mem[ip + 1]] + mem[mem[ip + 2]];
-				ip += 4;
-				break;
-			case 2:
-				mem[mem[ip + 3]] = mem[mem[ip + 1]] * mem[mem[ip + 2]];
-				ip += 4;
-				break;
-			case 99:
-				running = false;
-				break;
-		}
-	}
-}
+var machine = new IntCodeMachine();
 
-var input = ReadString().Split(',').Select(int.Parse).ToArray();
 {
-	var mem = input.ToArray();
-	mem[1] = 12;
-	mem[2] = 2;
-	Run(mem);
+	machine.Memory[1] = 12;
+	machine.Memory[2] = 2;
+	machine.Run();
 	
-	Console.WriteLine(mem[0]);
+	WriteLine(machine.Memory[0]);
 }
 
 {
 	for (int noun = 0; noun < 100; noun++) {
 		for (int verb = 0; verb < 100; verb++) {
-			var mem = input.ToArray();
-			mem[1] = noun;
-			mem[2] = verb;
-			Run(mem);
+			machine.Reset();
+			machine.Memory[1] = noun;
+			machine.Memory[2] = verb;
+			machine.Run();
 			
-			if (mem[0] == 19690720) Console.WriteLine(noun * 100 + verb);
+			if (machine.Memory[0] == 19690720) WriteLine(noun * 100 + verb);
 		}
 	}
 }
