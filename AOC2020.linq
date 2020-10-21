@@ -28,8 +28,12 @@ void Main() {
 		.DetectLoops()
 		.Search();
 		
-	foreach (var step in path!) maze = maze.With(start = start + step, '.');
-	maze.Dump();
+	foreach (var step in path!) 
+		maze = maze
+			.With(start = start + step, '.')
+			//.Materialize()
+			;
+	maze.Materialize().Dump();
 	
 	const int SomeNumber = 12345;
 	var binary = BreadthFirst.Create(0, new[] {0,1})
@@ -51,6 +55,7 @@ struct Direction : IEquatable<Direction> {
 	public override int GetHashCode() => (int)BitOperations.RotateRight((uint)DX, 16) ^ DY;
 	public bool Equals(Direction other) => other.DX == DX && other.DY == DY;
 
+	public static Direction Zero = new Direction(0, 0);
 	public static Direction N = new Direction(0, -1), E = new Direction(1, 0), S = new Direction(0, 1), W = new Direction(-1, 0);
 	public static Direction[] Cardinal = { N, E, S, W };
 	public static Direction NW = N + W, NE = N + E, SW = S + W, SE = S + E;
@@ -81,6 +86,8 @@ struct Position : IEquatable<Position> {
 
 	public Position(int x, int y) => (X, Y, Face) = (x, y, default);
 	public Position(int x, int y, Direction face) => (X, Y, Face) = (x, y, face);
+	
+	public static readonly Position Origin = new Position(0, 0);
 
 	public override int GetHashCode() => Face.GetHashCode()
 		^ (int)BitOperations.RotateRight((uint)X, 8)
@@ -155,21 +162,47 @@ class Board : IEnumerable<Position> {
 			if (Cells is object) return Cells[x, y];
 			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
 			if (++Misses > Width * Height) {
-				
+				Materialize();
+				return Cells[x, y];
 			}
 			return OriginalBoard![x, y];
 		}
 	}
 	public char this[Position p] => this[p.X, p.Y];
 	
+	public Board Materialize() {
+		if (Cells is object) return this;
+		
+		Cells = new char[Width, Height];
+		
+		var board = this;
+		var mods = new List<Board>();
+		while (board.OriginalBoard is Board current) {
+			mods.Add(board);
+			board = current;
+		}
+		
+		for (int i = 0; i < Width; i++)
+			for (int j = 0; j < Height; j++) Cells[i, j] = board.Cells![i, j];
+		
+		mods.Reverse();
+		foreach (var mod in mods) {
+			var pos = mod.ChangedPosition!.Value;
+			Cells[pos.X, pos.Y] = mod.NewChar!.Value;
+		}
+		
+		OriginalBoard = null;
+		ChangedPosition = null;
+		NewChar = null;
+		
+		return this;
+	}
+	
 	public bool Contains(Position p) => Contains(p.X, p.Y);
 	public bool Contains(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
 
-	public Board With(int x, int y, char c) {
-		var newCells = (char[,])Cells.Clone();
-		newCells[x, y] = c;
-		return new Board(newCells);
-	}
+	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
+
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
 
 	public IEnumerator<Position> GetEnumerator() {
@@ -373,3 +406,29 @@ public class PriorityQueue<T> {
 		return result;
 	}
 }
+
+string ReadString() {
+	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
+	return File.ReadAllText(filename);
+}
+
+string[] ReadLines() {
+	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
+	return File.ReadAllLines(filename);
+}
+
+int[] ReadInts() {
+	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
+	return File.ReadLines(filename).Select(int.Parse).ToArray();
+}
+
+long[] ReadLongs() {
+	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
+	return File.ReadLines(filename).Select(long.Parse).ToArray();
+}
+
+Board ReadBoard() {
+	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
+	return new Board(File.ReadAllText(filename));
+}
+
