@@ -18,7 +18,6 @@ void Main() {
 		X@X        X!  X
 		XXXXXXXXXXXXXXXX"[2..]);
 		
-	maze.Dump();
 	var start = maze.Find("@").Dump("start");
 	
 	var path = DepthFirst.Create(start, Direction.Cardinal)
@@ -32,11 +31,15 @@ void Main() {
 	foreach (var step in path!) maze = maze.With(start = start + step, '.');
 	maze.Dump();
 	
+	const int SomeNumber = 12345;
 	var binary = BreadthFirst.Create(0, new[] {0,1})
-		.SetGoal(12345.Equals)
+		.SetGoal(SomeNumber.Equals)
 		.SetTransition((val, bit) => 2 * val + bit)
 		.Search();
-	string.Concat(binary).Dump();
+	string.Concat(binary!).Dump("Binary: " + SomeNumber);
+
+	var q = new PriorityQueue<int>(n => n, Enumerable.Repeat(new Random(), 100).Select(rng => rng.Next(100)));
+	while (q.Count > 0) Console.WriteLine(q.Pop());
 }
 
 struct Direction : IEquatable<Direction> {
@@ -66,6 +69,9 @@ struct Direction : IEquatable<Direction> {
 	public void Deconstruct(out int dx, out int dy) => (dx, dy) = (DX, DY);
 	
 	public static Direction operator +(Direction a, Direction b) => new Direction(a.DX + b.DX, a.DY + b.DY);
+	public static bool operator ==(Direction a, Direction b) => a.DX == b.DX && a.DY == b.DY;
+	public static bool operator !=(Direction a, Direction b) => !(a == b);
+	public override bool Equals(object? obj) => obj is Direction d && this == d;
 }
 
 struct Position : IEquatable<Position> {
@@ -95,6 +101,10 @@ struct Position : IEquatable<Position> {
 
 	public static Direction operator -(Position a, Position b) => new Direction(a.X - b.X, a.Y - b.Y);
 	public static Position operator +(Position p, Direction d) => new Position(p.X + d.DX, p.Y + d.DY, p.Face);
+	public static bool operator ==(Position a, Position b) => a.X == b.X && a.Y == b.Y && a.Face == b.Face;
+	public static bool operator !=(Position a, Position b) => !(a == b);
+	public override bool Equals(object? obj) => obj is Position p && this == p;
+	
 	public Position Move(Direction d) => this + d;
 
 	public int Manhattan(Position other) => (this - other).Manhattan();
@@ -111,34 +121,52 @@ struct Position : IEquatable<Position> {
 }
 
 class Board : IEnumerable<Position> {
-	private readonly char[,] _Cells;
 	public int Width { get; }
 	public int Height { get; }
+	private char[,]? Cells;
+	private Board? OriginalBoard;
+	private Position? ChangedPosition;
+	private char? NewChar;
+	private int Misses = 0;
 	
 	public Board(char[,] cells) {
-		_Cells = cells;
+		Cells = cells;
 		Width = cells.GetUpperBound(0) + 1;
 		Height = cells.GetUpperBound(1) + 1;
+	}
+	
+	public Board(Board oldBoard, Position changedPosition, char newChar) {
+		(OriginalBoard, Width, Height) = (oldBoard, oldBoard.Width, oldBoard.Height);
+		(ChangedPosition, NewChar) = (changedPosition, newChar);
 	}
 	
 	public Board(string cells) {
 		string[] lines = Regex.Split(cells, @"\r?\n");
 		Height = lines.Length;
 		Width = lines.Max(l => l.Length);
-		_Cells = new char[Width, Height];
+		Cells = new char[Width, Height];
 		
 		for (int y = 0; y < Height; y++)
-			for (int x = 0; x < lines[y].Length; x++) _Cells[x, y] = lines[y][x];
+			for (int x = 0; x < lines[y].Length; x++) Cells[x, y] = lines[y][x];
 	}
 	
-	public char this[int x, int y] => _Cells[x, y];
-	public char this[Position p] => _Cells[p.X, p.Y];
+	public char this[int x, int y] { 
+		get {
+			if (Cells is object) return Cells[x, y];
+			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
+			if (++Misses > Width * Height) {
+				
+			}
+			return OriginalBoard![x, y];
+		}
+	}
+	public char this[Position p] => this[p.X, p.Y];
 	
 	public bool Contains(Position p) => Contains(p.X, p.Y);
 	public bool Contains(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
 
 	public Board With(int x, int y, char c) {
-		var newCells = (char[,])_Cells.Clone();
+		var newCells = (char[,])Cells.Clone();
 		newCells[x, y] = c;
 		return new Board(newCells);
 	}
@@ -296,5 +324,52 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		}
 		
 		return null;
+	}
+}
+
+public class PriorityQueue<T> {
+	private List<(T Element, IComparable Priority)> Items = new List<(T, IComparable)>();
+	private readonly Func<T, IComparable> GetPriority;
+	
+	public int Count => Items.Count;
+	
+	public PriorityQueue(Func<T, IComparable> priority) => GetPriority = priority;
+
+	public PriorityQueue(Func<T, IComparable> priority, IEnumerable<T> elements) 
+		: this(priority) => AddAll(elements);
+
+	public void Add(T element) {
+		Items.Add((element, GetPriority(element)));
+		
+		for (int child = Count - 1, parent; child > 0; child = parent) {
+			parent = child - 1 >> 1;
+			if (Items[child].Priority.CompareTo(Items[parent].Priority) <= 0) break;
+			(Items[child], Items[parent]) = (Items[parent], Items[child]);
+		}
+	}
+	
+	public void AddAll(IEnumerable<T> elements) {
+		foreach (var element in elements) Add(element);
+	}
+	
+	public T Pop() {
+		T result = Items[0].Element;
+		
+		int child = 1, parent = 0;
+		for (; child < Count; parent = child, parent = child, child = 2 * child + 1) {
+			if (child < Count - 1 && Items[child].Priority.CompareTo(Items[child + 1].Priority) < 0) ++child;
+			Items[parent] = Items[child];
+		}
+		
+		Items[parent] = Items[Count - 1];
+		Items.RemoveAt(Count - 1);
+		if (parent == Count) return result;
+		
+		for (child = parent; child > 0; child = parent) {
+			parent = child - 1 >> 1;
+			if (Items[child].Priority.CompareTo(Items[parent].Priority) <= 0) break;
+			(Items[child], Items[parent]) = (Items[parent], Items[child]);
+		}
+		return result;
 	}
 }
