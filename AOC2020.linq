@@ -5,6 +5,8 @@
 </Query>
 
 void Main() {
+	Console.WriteLine(Permutations("abcd".ToArray()));
+
 	var maze = new Board(@"
 		XXXXXXXXXXXXXXXX
 		X           X  X
@@ -432,3 +434,19 @@ static Board ReadBoard() {
 	return new Board(File.ReadAllText(filename));
 }
 
+static IEnumerable<T[]> Permutations<T>(IEnumerable<T> values) => Permutations(values.ToArray());
+static IEnumerable<T[]> Permutations<T>(params T[] values) {
+	Array.Reverse(values);
+	var inputs = new List<T>();
+	for (int i = 0; ; i++) {
+		inputs.AddRange(values);
+		T[] result = new T[values.Length];
+		int p = i;
+		for (int j = values.Length; j > 0; p /= j--) {
+			result[j - 1] = inputs[p % j];
+			inputs.RemoveAt(p % j);
+		}
+		if (p > 0) yield break;
+		yield return result;
+	}
+}

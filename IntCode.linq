@@ -1,6 +1,7 @@
 <Query Kind="Program">
   <Namespace>static System.Console</Namespace>
   <Namespace>static System.Math</Namespace>
+  <Namespace>System.Collections.Concurrent</Namespace>
 </Query>
 
 #load ".\AOC2020"
@@ -12,7 +13,7 @@ public class IntCodeMachine {
 	private int[] InitialMemory;
 	public int[] Memory { get; set; }
 	
-	public Queue<int> Input { get; } = new Queue<int>();
+	public BlockingCollection<int> Input { get; } = new BlockingCollection<int>(new ConcurrentQueue<int>());
 	public Action<int>? Output { get; set; }
 	
 	private int IP = 0;
@@ -31,7 +32,7 @@ public class IntCodeMachine {
 		Memory = InitialMemory[..];
 		IP = 0;
 		Running = false;
-		Input.Clear();
+		while (Input.TryTake(out _));
 	}
 	
 	private ref int Operand(int n) {
@@ -84,7 +85,10 @@ public class IntCodeMachine {
 		}
 	}
 	
-	private int GetInput() => Input.Dequeue();
+	public void TakeInput(int input) => Input.Add(input);
+	public void TakeInput(params int[] input) => input.ToList().ForEach(TakeInput);
+	
+	private int GetInput() => Input.Take();
 	
 	private void DoOutput(int n) => (Output ?? WriteLine)(n);
 }

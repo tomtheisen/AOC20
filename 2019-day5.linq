@@ -9,12 +9,12 @@
 var machine = new IntCodeMachine();
 
 {
-	machine.Input.Enqueue(1);
+	machine.TakeInput(1);
 	machine.Run();
 }
 
 {
 	machine.Reset();
-	machine.Input.Enqueue(5);
+	machine.TakeInput(5);
 	machine.Run();
 }
