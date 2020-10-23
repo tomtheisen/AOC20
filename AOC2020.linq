@@ -101,6 +101,7 @@ struct Position : IEquatable<Position> {
 	public bool Equals(Position other)
 		=> other.X == X && other.Y == Y && other.Face.Equals(Face);
 
+	// make a new position one step in the facing direction
 	public Position Step() => new Position(X + Face.DX, Y + Face.DY, Face);
 	public Position Up() => this + Direction.N;
 	public Position Right() => this + Direction.E;
@@ -111,6 +112,7 @@ struct Position : IEquatable<Position> {
 	public Position CW() => this.FaceTo(Face.CW());
 	public Position CCW() => this.FaceTo(Face.CCW());
 	public Position Reverse() => this.FaceTo(Face.Reverse());
+	public Position Stop() => this.FaceTo(Direction.Zero);
 
 	public static Direction operator -(Position a, Position b) => new Direction(a.X - b.X, a.Y - b.Y);
 	public static Position operator +(Position p, Direction d) => new Position(p.X + d.DX, p.Y + d.DY, p.Face);
@@ -146,6 +148,14 @@ class Board : IEnumerable<Position> {
 		Cells = cells;
 		Width = cells.GetUpperBound(0) + 1;
 		Height = cells.GetUpperBound(1) + 1;
+	}
+	
+	public Board(int width, int height, char fillChar) {
+		width = Width;
+		height = Height;
+		Cells = new char[width, height];
+		for (int x = 0; x < width; x++)
+			for (int y = 0; y < height; y++) Cells[x, y] = fillChar;
 	}
 	
 	public Board(Board oldBoard, Position changedPosition, char newChar) {
