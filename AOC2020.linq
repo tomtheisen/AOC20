@@ -214,8 +214,8 @@ class Board : IEnumerable<Position> {
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
 
 	public IEnumerator<Position> GetEnumerator() {
-		for (int x = 0; x < this.Width; x++)
-			for (int y = 0; y < this.Height; y++)
+		for (int y = 0; y < this.Height; y++)
+			for (int x = 0; x < this.Width; x++)
 				yield return new Position(x, y);
 	}
 
