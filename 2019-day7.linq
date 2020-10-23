@@ -9,7 +9,7 @@
 
 {
 	var machine = new IntCodeMachine();
-	int power, result = int.MinValue;
+	long power, result = int.MinValue;
 	machine.Output = o => power = o;
 	
 	foreach (var perm in Permutations(0,1,2,3,4)) {
@@ -32,7 +32,7 @@
 	}
 	machines[^1].Output = machines[0].TakeInput;
 	
-	int result = int.MinValue;
+	long result = int.MinValue;
 	foreach (var perm in Permutations(5,6,7,8,9)) {
 		for (int i = 0; i < 5; i++) {
 			machines[i].Reset();
@@ -41,7 +41,7 @@
 		machines[0].TakeInput(0);
 		var tasks = machines.Select(m => Task.Factory.StartNew(m.Run)).ToArray();
 		Task.WaitAll(tasks);
-		result = Max(result, machines[0].Input.TryTake(out int t) ? t : throw new Exception());
+		result = Max(result, machines[0].Input.TryTake(out long t) ? t : throw new Exception());
 	}
 	WriteLine(result);
 }
