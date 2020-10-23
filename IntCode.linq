@@ -13,7 +13,7 @@ public class IntCodeMachine {
 	private int[] InitialMemory;
 	public int[] Memory { get; set; }
 	
-	public BlockingCollection<int> Input { get; } = new BlockingCollection<int>(new ConcurrentQueue<int>());
+	public BlockingCollection<int> Input { get; } = new BlockingCollection<int>();
 	public Action<int>? Output { get; set; }
 	
 	private int IP = 0;
@@ -92,3 +92,4 @@ public class IntCodeMachine {
 	
 	private void DoOutput(int n) => (Output ?? WriteLine)(n);
 }
+

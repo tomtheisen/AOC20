@@ -4,8 +4,12 @@
   <Namespace>System.Numerics</Namespace>
 </Query>
 
+#nullable enable
+
 void Main() {
-	Console.WriteLine(Permutations("abcd".ToArray()));
+	"foobar".BatchBy(3).Transpose().Dump();
+	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump();
+	Choose("abcde", 2).Select(x => string.Concat(x)).Dump();
 
 	var maze = new Board(@"
 		XXXXXXXXXXXXXXXX
@@ -149,14 +153,16 @@ class Board : IEnumerable<Position> {
 		(ChangedPosition, NewChar) = (changedPosition, newChar);
 	}
 	
-	public Board(string cells) {
-		string[] lines = Regex.Split(cells, @"\r?\n");
-		Height = lines.Length;
-		Width = lines.Max(l => l.Length);
+	public Board(string cells) : this(Regex.Split(cells, @"\r?\n")) { }
+	
+	public Board(IEnumerable<string> lines) {
+		var linesList = lines.ToList();
+		Height = linesList.Count;
+		Width = linesList.Max(l => l.Length);
 		Cells = new char[Width, Height];
 		
 		for (int y = 0; y < Height; y++)
-			for (int x = 0; x < lines[y].Length; x++) Cells[x, y] = lines[y][x];
+			for (int x = 0; x < linesList[y].Length; x++) Cells[x, y] = linesList[y][x];
 	}
 	
 	public char this[int x, int y] { 
@@ -438,15 +444,87 @@ static IEnumerable<T[]> Permutations<T>(IEnumerable<T> values) => Permutations(v
 static IEnumerable<T[]> Permutations<T>(params T[] values) {
 	Array.Reverse(values);
 	var inputs = new List<T>();
-	for (int i = 0; ; i++) {
+	int limit = Enumerable.Range(1, values.Length).Aggregate ((x, y) => x * y);
+	for (int i = 0; i < limit; i++) {
 		inputs.AddRange(values);
 		T[] result = new T[values.Length];
-		int p = i;
-		for (int j = values.Length; j > 0; p /= j--) {
+		for (int j = values.Length, p = i; j > 0; p /= j--) {
 			result[j - 1] = inputs[p % j];
 			inputs.RemoveAt(p % j);
 		}
-		if (p > 0) yield break;
 		yield return result;
+	}
+}
+
+static IEnumerable<T[]> Choose<T>(IEnumerable<T> values, int choose) {
+	if (choose == 0) {
+		yield return Array.Empty<T>();
+		yield break;
+	}
+	var arr = values.ToArray();
+	if (arr.Count() == choose) {
+		yield return arr;
+		yield break;
+	}
+	if (arr.Count() < choose) yield break;
+	
+	for (int i = 0; i < arr.Length; i++) {
+		foreach (var choice in Choose(values.Skip(i + 1), choose - 1)) {
+			yield return choice.Prepend(arr[i]).ToArray();
+		}
+	}
+	foreach (var choice in Choose(values.Skip(1), choose)) yield return choice;
+}
+
+public static class Extensions {
+	public static IEnumerable<List<T>> BatchBy<T>(this IEnumerable<T> @this, int size) {
+		var current = new List<T>();
+		foreach (var element in @this) {
+			current.Add(element);
+			if (current.Count == size) {
+				yield return current;
+				current = new List<T>();
+			}
+		}
+		if (current.Count > 0) yield return current;
+	}
+	
+	public static T MinBy<T>(this IEnumerable<T> @this, Func<T, IComparable> keyFunc) {
+		bool first = true;
+		T bestT = default;
+		IComparable? bestKey = default;
+		foreach (var element in @this) {
+			IComparable key = keyFunc(element);
+			if (first || key.CompareTo(bestKey) < 0) {
+				(bestT, bestKey, first) = (element, key, false);
+			}
+		}
+		return bestT ?? throw new ArgumentOutOfRangeException("Empty sequence");
+	}
+	
+	public static T MaxBy<T>(this IEnumerable<T> @this, Func<T, IComparable> keyFunc) {
+		bool first = true;
+		T bestT = default;
+		IComparable? bestKey = default;
+		foreach (var element in @this) {
+			IComparable key = keyFunc(element);
+			if (first || key.CompareTo(bestKey) > 0) {
+				(bestT, bestKey, first) = (element, key, false);
+			}
+		}
+		return bestT ?? throw new ArgumentOutOfRangeException("Empty sequence");
+	}
+	
+	public static int Count<T>(this IEnumerable<T> @this, T search) 
+		where T: IEquatable<T> => @this.Count(search.Equals);
+		
+	public static IEnumerable<List<T>> Transpose<T>(this IEnumerable<IEnumerable<T>> @this) {
+		var enumerators = @this.Select(t => t.GetEnumerator()).ToList();
+		
+		while (true) {
+			enumerators.RemoveAll(e => !e.MoveNext());
+			if (enumerators.Count == 0) yield break;
+			yield return enumerators.Select(e => e.Current).ToList();
+		}
 	}
 }
