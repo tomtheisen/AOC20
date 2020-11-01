@@ -11,16 +11,18 @@ void Main() {
 	m.Run();
 }
 
-public class IntCodeMachine {
+public class IntCodeMachine : IObservable<long> {
 	private long[] InitialMemory;
 	public long[] Memory { get; set; }
 	
 	public BlockingCollection<long> Input { get; } = new BlockingCollection<long>();
 	public Action<long>? Output { get; set; }
+	public Func<long> InputOverride { get; set; }
 	
 	private int IP = 0;
 	private int RelativeBase = 0;
 	private bool Running = false;
+	private readonly List<IObserver<long>> Observers = new List<IObserver<long>>();
 	
 	public IntCodeMachine() 
 		: this(ReadString().Split(',').Select(long.Parse).ToArray()) {}
@@ -52,59 +54,95 @@ public class IntCodeMachine {
 		return ref result;
 	}
 	
+	public long? Step() {
+		switch (Memory[IP] % 100) {
+			case 1:
+				Operand(3) = Operand(1) + Operand(2);
+				IP += 4;
+				break;
+			case 2:
+				Operand(3) = Operand(1) * Operand(2);
+				IP += 4;
+				break;
+			case 3: 
+				Operand(1) = GetInput();
+				IP += 2;
+				break;
+			case 4:
+				var output = Operand(1);
+				DoOutput(output);
+				IP += 2;
+				return output;
+			case 5:
+				if (Operand(1) != 0) IP = (int)Operand(2);
+				else IP += 3;
+				break;
+			case 6:
+				if (Operand(1) == 0) IP = (int)Operand(2);
+				else IP += 3;
+				break;
+			case 7:
+				Operand(3) = Operand(1) < Operand(2) ? 1 : 0;
+				IP += 4;
+				break;
+			case 8:
+				Operand(3) = Operand(1) == Operand(2) ? 1 : 0;
+				IP += 4;
+				break;
+			case 9:
+				RelativeBase += (int)Operand(1);
+				IP += 2;
+				break;
+			case 99:
+				Running = false;
+				break;
+		}
+		return null;
+	}
+	
+	public long? RunToNextOutput() {
+		Running = true;
+		long? output;
+		do output = Step();
+		while (Running && output == null);
+		return output;
+	}
+	
+	public long RunToNextOutputOrThrow() => RunToNextOutput() ?? throw new Exception("machine terminated unexpectedly");
+	
 	public void Run() {
 		IP = 0;
 		Running = true;
-		while (Running) { 
-			switch (Memory[IP] % 100) {
-				case 1:
-					Operand(3) = Operand(1) + Operand(2);
-					IP += 4;
-					break;
-				case 2:
-					Operand(3) = Operand(1) * Operand(2);
-					IP += 4;
-					break;
-				case 3: 
-					Operand(1) = GetInput();
-					IP += 2;
-					break;
-				case 4:
-					DoOutput(Operand(1));
-					IP += 2;
-					break;
-				case 5:
-					if (Operand(1) != 0) IP = (int)Operand(2);
-					else IP += 3;
-					break;
-				case 6:
-					if (Operand(1) == 0) IP = (int)Operand(2);
-					else IP += 3;
-					break;
-				case 7:
-					Operand(3) = Operand(1) < Operand(2) ? 1 : 0;
-					IP += 4;
-					break;
-				case 8:
-					Operand(3) = Operand(1) == Operand(2) ? 1 : 0;
-					IP += 4;
-					break;
-				case 9:
-					RelativeBase += (int)Operand(1);
-					IP += 2;
-					break;
-				case 99:
-					Running = false;
-					break;
-			}
-		}
+		while (Running) Step();
+		
+		Observers.ForEach(o => o.OnCompleted());
 	}
 	
 	public void TakeInput(long input) => Input.Add(input);
 	public void TakeInput(params long[] input) => input.ToList().ForEach(TakeInput);
 	
-	private long GetInput() => Input.Take();
+	private long GetInput() => InputOverride?.Invoke() ?? Input.Take();
 	
-	private void DoOutput(long n) => (Output ?? WriteLine)(n);
+	private void DoOutput(long n) {
+		(Output ?? WriteLine)(n);
+		Observers.ForEach(o => o.OnNext(n));
+	}
+
+	private class Subscription : IDisposable {
+		private IntCodeMachine Machine;
+		private IObserver<long> Observer;
+		
+		public Subscription(IntCodeMachine machine, IObserver<long> observer) {
+			this.Machine = machine;
+			this.Observer = observer;
+		}
+		
+		public void Dispose() => Machine.Observers.Remove(Observer);
+	}
+
+	public IDisposable Subscribe(IObserver<long> observer) {
+		Observers.Add(observer);
+		return new Subscription(this, observer);
+	}
 }
 

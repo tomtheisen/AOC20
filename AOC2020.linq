@@ -150,16 +150,21 @@ class Board : IEnumerable<Position> {
 		Height = cells.GetUpperBound(1) + 1;
 	}
 	
-	public Board(int width, int height, char fillChar) {
-		width = Width;
-		height = Height;
+	public Board(int width, int height, char fillChar = ' ') {
+		Width = width;
+		Height = height;
 		Cells = new char[width, height];
 		for (int x = 0; x < width; x++)
 			for (int y = 0; y < height; y++) Cells[x, y] = fillChar;
 	}
 	
+	public Board() : this(0, 0) { }
+	
 	public Board(Board oldBoard, Position changedPosition, char newChar) {
-		(OriginalBoard, Width, Height) = (oldBoard, oldBoard.Width, oldBoard.Height);
+		if (changedPosition.X < 0 || changedPosition.Y < 0) throw new ArgumentOutOfRangeException(nameof(changedPosition));
+		OriginalBoard = oldBoard;
+		Width = Max(oldBoard.Width, changedPosition.X + 1);
+		Height = Max(oldBoard.Height, changedPosition.Y + 1);
 		(ChangedPosition, NewChar) = (changedPosition, newChar);
 	}
 	
@@ -177,6 +182,7 @@ class Board : IEnumerable<Position> {
 	
 	public char this[int x, int y] { 
 		get {
+			if (x >= Width || y >= Height) return ' ';
 			if (Cells is object) return Cells[x, y];
 			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
 			if (++Misses > Width * Height) {
@@ -201,7 +207,9 @@ class Board : IEnumerable<Position> {
 		}
 		
 		for (int i = 0; i < Width; i++)
-			for (int j = 0; j < Height; j++) Cells[i, j] = board.Cells![i, j];
+			for (int j = 0; j < Height; j++) {
+				Cells[i, j] = i < board.Width && j < board.Height ? board.Cells![i, j] : ' ';
+			}
 		
 		mods.Reverse();
 		foreach (var mod in mods) {
@@ -450,6 +458,14 @@ static Board ReadBoard() {
 	return new Board(File.ReadAllText(filename));
 }
 
+public class ListComparer<T> : IEqualityComparer<IReadOnlyList<T>> {
+	public bool Equals(IReadOnlyList<T>? x, IReadOnlyList<T>? y)
+		=> x?.SequenceEqual(y) ?? false;
+
+	public int GetHashCode(IReadOnlyList<T> obj)
+		=> obj.Aggregate (0, (x, y) => unchecked(x * 37 + (y?.GetHashCode() ?? 0)));
+}
+
 static IEnumerable<T[]> Permutations<T>(IEnumerable<T> values) => Permutations(values.ToArray());
 static IEnumerable<T[]> Permutations<T>(params T[] values) {
 	Array.Reverse(values);
@@ -523,6 +539,13 @@ public static class Extensions {
 			}
 		}
 		return bestT ?? throw new ArgumentOutOfRangeException("Empty sequence");
+	}
+	
+	public static IEnumerable<T> DistinctBy<T, TKey>(this IEnumerable<T> @this, Func<T, TKey> keyFunc) {
+		var seen = new HashSet<TKey>();
+		foreach (var element in @this) {
+			if (seen.Add(keyFunc(element))) yield return element;
+		}
 	}
 	
 	public static int Count<T>(this IEnumerable<T> @this, T search) 
