@@ -31,33 +31,43 @@ void Main() {
 			return;
 		}
 		
-		while (stock[name] < quantity) {
-			while (recipes[name].components.Any(c => stock[c.name] < c.quant)) {
+		if (stock[name] < quantity) {
+			int batches = (int)((quantity - stock[name] + recipes[name].quant - 1) / recipes[name].quant);
+			
+			while (recipes[name].components.Any(c => stock[c.name] < c.quant * batches)) {
 				foreach (var (n, q) in recipes[name].components) {
-					CraftOrMine(n, q);
+					CraftOrMine(n, q * batches);
 				}
 			}
 			
 			foreach (var (n, q) in recipes[name].components) {
-				stock[n] -= q;
+				stock[n] -= q * batches;
 			}
-			stock[name] += recipes[name].quant;
+			stock[name] += recipes[name].quant * batches;
 		}
 	}
 	
-	bool Craft(string name, int quantity) {
+	bool Craft(string name, long quantity) {
 		if (stock[name] >= quantity) return true;
 
-		while (stock[name] < quantity) {
-			while (recipes[name].components.FirstOrDefault(c => stock[c.name] < c.quant) is (string n, int q)) {
-				if (n == "ORE") return false;
-				if (!Craft(n, q)) return false;
-			}
+		if (stock[name] < quantity) {
+			long batches = (quantity - stock[name] + recipes[name].quant - 1) / recipes[name].quant;
+			bool hadtomake;
+			do {
+				hadtomake = false;
+				foreach (var (cname, cquant) in recipes[name].components) {
+					if (stock[cname] < cquant * batches) {
+						if (cname == "ORE") return false;
+						if (!Craft(cname, cquant * batches)) return false;
+						hadtomake = true;
+					}
+				}
+			} while (hadtomake);
 			
 			foreach (var (n, q) in recipes[name].components) {
-				stock[n] -= q;
+				stock[n] -= q * batches;
 			}
-			stock[name] += recipes[name].quant;
+			stock[name] += recipes[name].quant * batches;
 		}
 		return true;
 	}
@@ -66,10 +76,17 @@ void Main() {
 	oreMined.Dump();
 	
 	foreach (var name in stock.Keys.ToList()) stock[name] = 0;
- 	//stock["ORE"] = 1_000_000_000_000;
- 	stock["ORE"] = 1_000_000_000;
-	Craft("FUEL", int.MaxValue);
+ 	stock["ORE"] = 1_000_000_000_000;
+	var oreContainer = new DumpContainer().Dump("ORE");
+	var fuelContainer = new DumpContainer().Dump("FUEL");
+	
+	long verifiedFuel;
+	Dictionary<string, long> verifiedStock;
+	long target = 1;
+	while(Craft("FUEL", target *= 2)) {
+		oreContainer.Content = stock["ORE"];
+		fuelContainer.Content = verifiedFuel = stock["FUEL"];
+		verifiedStock = stock.Clone();
+	}
 	stock["FUEL"].Dump();
 }
-
-// You can define other methods, fields, classes and namespaces here

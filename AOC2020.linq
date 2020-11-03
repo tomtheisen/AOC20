@@ -560,4 +560,7 @@ public static class Extensions {
 			yield return enumerators.Select(e => e.Current).ToList();
 		}
 	}
+	
+	public static Dictionary<TKey, TValue> Clone<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> @this) where TKey: notnull
+		=> new Dictionary<TKey, TValue>(@this);
 }
