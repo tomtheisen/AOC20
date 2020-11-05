@@ -7,9 +7,9 @@
 #nullable enable
 
 void Main() {
-	"foobar".BatchBy(3).Transpose().Dump();
-	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump();
-	Choose("abcde", 2).Select(x => string.Concat(x)).Dump();
+	"foobar".BatchBy(3).Transpose().Dump("batch");
+	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump("permutations");
+	Choose("abcde", 2).Select(x => string.Concat(x)).Dump("choose");
 
 	var maze = new Board(@"
 		XXXXXXXXXXXXXXXX
@@ -39,7 +39,14 @@ void Main() {
 			.With(start = start + step, '.')
 			//.Materialize()
 			;
-	maze.Materialize().Dump();
+	maze.Materialize().Dump("DFS");
+	
+	new Board()
+		.With(-5, 0, 'W')
+		.With(0, -5, 'N')
+		.With(5, 0, 'E')
+		.With(0, 5, 'S')
+		.Dump("Negative extent test");
 	
 	const int SomeNumber = 12345;
 	var binary = BreadthFirst.Create(0, new[] {0,1})
@@ -48,6 +55,7 @@ void Main() {
 		.Search();
 	string.Concat(binary!).Dump("Binary: " + SomeNumber);
 
+	Console.WriteLine("Priority Queue");
 	var q = new PriorityQueue<int>(n => n, Enumerable.Repeat(new Random(), 100).Select(rng => rng.Next(100)));
 	while (q.Count > 0) Console.WriteLine(q.Pop());
 }
@@ -138,6 +146,11 @@ struct Position : IEquatable<Position> {
 class Board : IEnumerable<Position> {
 	public int Width { get; }
 	public int Height { get; }
+	public int Left { get; }
+	public int Top { get; }
+	public int Right => Left + Width;
+	public int Bottom => Top + Height;
+	
 	private char[,]? Cells;
 	private Board? OriginalBoard;
 	private Position? ChangedPosition;
@@ -146,11 +159,13 @@ class Board : IEnumerable<Position> {
 	
 	public Board(char[,] cells) {
 		Cells = cells;
+		Top = Left = 0;
 		Width = cells.GetUpperBound(0) + 1;
 		Height = cells.GetUpperBound(1) + 1;
 	}
 	
 	public Board(int width, int height, char fillChar = ' ') {
+		Top = Left = 0;
 		Width = width;
 		Height = height;
 		Cells = new char[width, height];
@@ -161,10 +176,11 @@ class Board : IEnumerable<Position> {
 	public Board() : this(0, 0) { }
 	
 	public Board(Board oldBoard, Position changedPosition, char newChar) {
-		if (changedPosition.X < 0 || changedPosition.Y < 0) throw new ArgumentOutOfRangeException(nameof(changedPosition));
 		OriginalBoard = oldBoard;
-		Width = Max(oldBoard.Width, changedPosition.X + 1);
-		Height = Max(oldBoard.Height, changedPosition.Y + 1);
+		Left = Min(oldBoard.Left, changedPosition.X);
+		Top = Min(oldBoard.Top, changedPosition.Y);
+		Width = Max(oldBoard.Right, changedPosition.X + 1) - Left;
+		Height = Max(oldBoard.Bottom, changedPosition.Y + 1) - Top;
 		(ChangedPosition, NewChar) = (changedPosition, newChar);
 	}
 	
@@ -172,8 +188,9 @@ class Board : IEnumerable<Position> {
 	
 	public Board(IEnumerable<string> lines) {
 		var linesList = lines.ToList();
+		Top = Left = 0;
 		Height = linesList.Count;
-		Width = linesList.Max(l => l.Length);
+		Width = linesList.DefaultIfEmpty().Max(l => l?.Length ?? 0);
 		Cells = new char[Width, Height];
 		
 		for (int y = 0; y < Height; y++)
@@ -182,12 +199,12 @@ class Board : IEnumerable<Position> {
 	
 	public char this[int x, int y] { 
 		get {
-			if (x >= Width || y >= Height) return ' ';
-			if (Cells is object) return Cells[x, y];
+			if (!Contains(x, y)) return ' ';
+			if (Cells is object) return Cells[x - Left, y - Top];
 			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
 			if (++Misses > Width * Height) {
 				Materialize();
-				return Cells[x, y];
+				return Cells![x - Left, y - Top];
 			}
 			return OriginalBoard![x, y];
 		}
@@ -206,15 +223,14 @@ class Board : IEnumerable<Position> {
 			board = current;
 		}
 		
-		for (int i = 0; i < Width; i++)
-			for (int j = 0; j < Height; j++) {
+		for (int i = Left; i < Right; i++)
+			for (int j = Top; j < Bottom; j++)
 				Cells[i, j] = i < board.Width && j < board.Height ? board.Cells![i, j] : ' ';
-			}
 		
 		mods.Reverse();
 		foreach (var mod in mods) {
 			var pos = mod.ChangedPosition!.Value;
-			Cells[pos.X, pos.Y] = mod.NewChar!.Value;
+			Cells[pos.X - Left, pos.Y - Top] = mod.NewChar!.Value;
 		}
 		
 		OriginalBoard = null;
@@ -225,15 +241,15 @@ class Board : IEnumerable<Position> {
 	}
 	
 	public bool Contains(Position p) => Contains(p.X, p.Y);
-	public bool Contains(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
+	public bool Contains(int x, int y) => x >= Left && x < Right && y >= Top && y < Bottom;
 
 	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
 
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
 
 	public IEnumerator<Position> GetEnumerator() {
-		for (int y = 0; y < this.Height; y++)
-			for (int x = 0; x < this.Width; x++)
+		for (int y = Top; y < Bottom; y++)
+			for (int x = Left; x < Right; x++)
 				yield return new Position(x, y);
 	}
 
@@ -244,8 +260,8 @@ class Board : IEnumerable<Position> {
 	
 	public string ToDump() {
 		var sb = new StringBuilder();
-		for (int y = 0; y < this.Height; y++, sb.Append('\n'))
-			for (int x = 0; x < this.Width; x++) sb.Append(this[x, y]);
+		for (int y = Top; y < Bottom; y++, sb.Append('\n'))
+			for (int x = Left; x < Right; x++) sb.Append(this[x, y]);
 		return sb.ToString();
 	}
 }

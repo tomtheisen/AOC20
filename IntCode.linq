@@ -17,7 +17,7 @@ public class IntCodeMachine : IObservable<long> {
 	
 	public BlockingCollection<long> Input { get; } = new BlockingCollection<long>();
 	public Action<long>? Output { get; set; }
-	public Func<long> InputOverride { get; set; }
+	public Func<long>? InputOverride { get; set; }
 	
 	private int IP = 0;
 	private int RelativeBase = 0;
@@ -41,11 +41,12 @@ public class IntCodeMachine : IObservable<long> {
 	}
 	
 	private ref long Operand(int n) {
-		long mode = Memory[IP] / n switch { 1 => 100, 2 => 1000, 3 => 10000 } % 10;
+		long mode = Memory[IP] / n switch { 1 => 100, 2 => 1000, 3 => 10000, _ => throw new ArgumentOutOfRangeException(nameof(n)) } % 10;
 		int ptr = (int)(mode switch { 
 			0 => Memory[IP + n], 
 			1 => IP + n, 
-			2 => Memory[IP + n] + RelativeBase 
+			2 => Memory[IP + n] + RelativeBase,
+			_ => throw new ArgumentOutOfRangeException(nameof(n)),
 		});
 		var memory = this.Memory;
 		if (ptr >= Memory.Length) Array.Resize(ref memory, ptr + 1);
@@ -145,4 +146,3 @@ public class IntCodeMachine : IObservable<long> {
 		return new Subscription(this, observer);
 	}
 }
-
