@@ -11,18 +11,25 @@
 string input = ReadLines()[0];
 
 
-string current = input;
+var current = input.Select(i => i - 48).ToArray();
+var next = new int[input.Length];
 for (int i = 0; i < 100; i++) {
-	string next = "";
 	for (int j = 0; j < input.Length; j++) {
-		int sum = 0;
-		for (int k = 0; k < input.Length; k++) {
-			int multiplier = ((k + 1) / (j + 1) % 4) switch { 1=>1, 3=>-1, _=>0 };
-			sum += multiplier * (current[k] - 48);
+		if (j > input.Length / 2) {
+			next[j] = (next[j - 1] - current[j - 1] + 10) % 10;
 		}
-		next += Abs(sum % 10);
+		else {
+			int sum = 0;
+			for (int k = j; k < input.Length; k++) {
+				int multiplier = ((k + 1) / (j + 1) % 4) switch { 1=>1, 3=>-1, _=>0 };
+				sum += multiplier * current[k];
+			}
+			next[j] = Abs(sum % 10);
+		}
 	}
-	current = next;
+	(current, next) = (next, current);
+	
+	//string.Concat(current).Dump();
 }
 
-current[..8].Dump();
+string.Concat(current[..8]).Dump();
