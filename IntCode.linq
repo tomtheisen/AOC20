@@ -33,6 +33,19 @@ public class IntCodeMachine : IObservable<long> {
 		Reset();
 	}
 	
+	public IntCodeMachine Clone() {
+		var result = new IntCodeMachine(InitialMemory) {
+			Memory = Memory[..],
+			Output = Output,
+			InputOverride = InputOverride,
+			IP = IP,
+			RelativeBase = RelativeBase,
+			Running = Running,
+		};
+		result.Observers.AddRange(Observers);
+		return result;
+	}
+	
 	public void Reset() {
 		Memory = InitialMemory[..];
 		RelativeBase = IP = 0;

@@ -58,6 +58,8 @@ void Main() {
 	Console.WriteLine("Priority Queue");
 	var q = new PriorityQueue<int>(n => n, Enumerable.Repeat(new Random(), 100).Select(rng => rng.Next(100)));
 	while (q.Count > 0) Console.WriteLine(q.Pop());
+	
+	new Board(".").With(0, -1, '#').With(0, 1, '#').Materialize().With(-1, 0, '.').Dump();
 }
 
 struct Direction : IEquatable<Direction> {
@@ -225,7 +227,9 @@ class Board : IEnumerable<Position> {
 		
 		for (int i = Left; i < Right; i++)
 			for (int j = Top; j < Bottom; j++)
-				Cells[i, j] = i < board.Width && j < board.Height ? board.Cells![i, j] : ' ';
+				Cells[i - Left, j - Top] = board.Contains(i, j) 
+					? board.Cells![i - board.Left, j - board.Top] 
+					: ' ';
 		
 		mods.Reverse();
 		foreach (var mod in mods) {
