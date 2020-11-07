@@ -463,6 +463,8 @@ static string[] ReadLines() {
 	return File.ReadAllLines(filename);
 }
 
+public static int[] ReadDigits() => ReadLines()[0].Select(e => e - '0').ToArray();
+
 static int[] ReadInts() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return File.ReadLines(filename).Select(int.Parse).ToArray();
