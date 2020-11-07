@@ -205,7 +205,7 @@ class Board : IEnumerable<Position> {
 			if (!Contains(x, y)) return ' ';
 			if (Cells is object) return Cells[x - Left, y - Top];
 			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
-			if (++Misses > Width * Height) {
+			if (++Misses > 2 * Width * Height) {
 				Materialize();
 				return Cells![x - Left, y - Top];
 			}
@@ -367,6 +367,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		foreach (var act in Acts) {
 			if (ActFilters.Any(af => !af(state, act))) continue;
 			var newState = Transition(state, act);
+			if (newState is null) continue;
 			if (StateFilters.Any(sf => !sf(newState))) continue;
 			var newHistory = history.AndThen(act);
 			if (Search(newState, newHistory) is IEnumerable<TAct> result) return result;
@@ -397,6 +398,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
 				var newState = Transition(state, act);
+				if (newState is null) continue;
 				if (StateFilters.Any(sf => !sf(newState))) continue;
 				var newHistory = history.AndThen(act);
 				queue.Enqueue((newState, newHistory));
