@@ -196,7 +196,8 @@ class Board : IEnumerable<Position> {
 		Cells = new char[Width, Height];
 		
 		for (int y = 0; y < Height; y++)
-			for (int x = 0; x < linesList[y].Length; x++) Cells[x, y] = linesList[y][x];
+			for (int x = 0; x < Width; x++)
+				Cells[x, y] = (x < linesList[y].Length) ? linesList[y][x] : ' ';
 	}
 	
 	public char this[int x, int y] { 

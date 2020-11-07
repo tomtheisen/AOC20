@@ -134,6 +134,7 @@ public class IntCodeMachine : IObservable<long> {
 	
 	public void TakeInput(long input) => Input.Add(input);
 	public void TakeInput(params long[] input) => input.ToList().ForEach(TakeInput);
+	public void TakeInput(string input) => TakeInput(input.Select(i => (long)i).ToArray());
 	
 	private long GetInput() => InputOverride?.Invoke() ?? Input.Take();
 	
