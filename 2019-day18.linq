@@ -13,17 +13,28 @@ void Main() {
 	var board = ReadBoard();
 	
 	var boardContainer = new DumpContainer(board);
-	board.ToLazy().Dump("board");
+	
+	bool modified;
+	do {
+		modified = false;
+		foreach (var p in board) {
+			if (board[p]=='.' && Direction.Cardinal.Count(c => board[p.Move(c)] == '#') == 3) {
+				modified = true;
+				board = board.With(p, '#');
+			}
+		}
+	} while (!modified);
+	
+	board.Dump("board");
 	
 	var pos = board.Find("@");
-	
 	boardContainer.Content = board = board.With(pos, '.');
 	
 	int goalKeys = board.Aggregate(0, 
 		(acc, pos) => board[pos] >= 'a' && board[pos] <= 'z' ? (1 << board[pos] - 'a' | acc) : acc)
 		.Dump("Goal Keys Mask");
 
-	/*
+	//*
 	BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 		.AddStateFilter(state => {
 			char tile = board[state.Position];
@@ -91,11 +102,13 @@ void Main() {
 			if (tile >= 'A' && tile <= 'Z') return (state.Keys >> tile - 'A' & 1) > 0;
 			return true;
 		})
+		.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
 		.SetGoal(state => state.Keys == goalKeys)
 		.SetDumpContainer()
 		.DetectLoops()
 		.Search()
-		.Dump();
+		.Count(char.IsLetter)
+		.Dump("Part 2");
 }
 
 struct Quad {
