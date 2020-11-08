@@ -10,15 +10,16 @@
 
 var board = ReadBoard();
 
-var boardContainer = new DumpContainer(board).Dump("board");
+var boardContainer = new DumpContainer(board);
+board.ToLazy().Dump("board");
 
-var pos = board.Find("@").Dump("Position");
+var pos = board.Find("@").Dump("@ Position");
 
 boardContainer.Content = board = board.With(pos, '.');
 
 int goalKeys = board.Aggregate(0, 
 	(acc, pos) => board[pos] >= 'a' && board[pos] <= 'z' ? (1 << board[pos] - 'a' | acc) : acc)
-	.Dump("goal");
+	.Dump("Goal Keys Mask");
 
 BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 	.AddStateFilter(state => {
@@ -36,9 +37,9 @@ BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 		return new { Position = newPos, Keys = newKeys };
 	})
 	.DetectLoops()
-	//.SetDumpContainer(new DumpContainer().Dump("DFS"))
+	.SetDumpContainer(new DumpContainer{ DumpDepth = 3 }.Dump("BFS"))
 	.Search()
 	.Count()
-	.Dump();
+	.Dump("Part 1");
 	
 	

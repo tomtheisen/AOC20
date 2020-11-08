@@ -2,6 +2,7 @@
   <Namespace>static System.Math</Namespace>
   <Namespace>System.Diagnostics.CodeAnalysis</Namespace>
   <Namespace>System.Numerics</Namespace>
+  <Namespace>System.Drawing</Namespace>
 </Query>
 
 #nullable enable
@@ -32,6 +33,7 @@ void Main() {
 		.AddStateFilter(maze.Contains)
 		.AddStateFilter(pos => maze[pos] != 'X')
 		.DetectLoops()
+		.SetDumpContainer(new DumpContainer().Dump())
 		.Search();
 		
 	foreach (var step in path!) 
@@ -277,10 +279,11 @@ public class History<T> : IEnumerable<T> {
 	public readonly T Last;
 	public readonly History<T> Prefix;
 	private readonly bool IsEmpty;
+	public readonly int Length;
 	
 	public History() => (IsEmpty, Prefix, Last) = (true, this, default!);
 	public History(T start) => (Prefix, Last) = (new History<T>(), start);
-	public History(History<T> prefix, T last) => (Prefix, Last) = (prefix, last);
+	public History(History<T> prefix, T last) => (Prefix, Last, Length) = (prefix, last, prefix.Length + 1);
 	
 	public History<T> AndThen(T state) => new History<T>(this, state);
 
@@ -306,6 +309,8 @@ public abstract class SearchBase<TState, TAct> {
 	public HashSet<TState>? Seen { get; set; }
 	public TState Start { get; set; }
 	public DumpContainer? DumpContainer { get; set; }
+	public int StatesEvaluated { get; protected set; }
+	public Stopwatch Timer { get; } = new Stopwatch();
 
 	public SearchBase(TState start, IList<TAct> acts) {
 		this.Start = start;
@@ -344,7 +349,11 @@ public abstract class SearchBase<TState, TAct> {
 		return this;
 	}
 	
-	public abstract IEnumerable<TAct>? Search();
+	public IEnumerable<TAct>? Search() {
+		this.Timer.Start();
+		return this.SearchCore();
+	}
+	public abstract IEnumerable<TAct>? SearchCore();
 }
 
 public static class DepthFirst {
@@ -353,16 +362,44 @@ public static class DepthFirst {
 }
 
 public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
+	private TimeSpan LastReport = TimeSpan.Zero;
+	private int LongestHistory = 0;
+
 	public DepthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
 	
-	public override IEnumerable<TAct>? Search() => Search(Start, new History<TAct>());
+	public override IEnumerable<TAct>? SearchCore() => Search(Start, new History<TAct>());
+	
+	private List<double> StatesRateHistory = new List<double>();
+	private List<int> LongestHistoryLengthHistory = new List<int>();
+	private List<double> ElapsedHistory = new List<double>();
+	private void DumpState(bool forceShow, TState state, History<TAct> history) {
+		if (DumpContainer is object) {
+			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
+				StatesRateHistory.Add(StatesEvaluated / this.Timer.Elapsed.TotalSeconds);
+				LongestHistoryLengthHistory.Add(LongestHistory);
+				ElapsedHistory.Add(this.Timer.Elapsed.TotalSeconds);
+				DumpContainer.Content = new { 
+					State = state, 
+					this.StatesEvaluated,
+					HistoryLength = history.Length, 
+					LastReport = LastReport = this.Timer.Elapsed,
+					Status = ElapsedHistory.Chart()
+						.AddYSeries(LongestHistoryLengthHistory, name: "Longest Branch Explored", seriesType: Util.SeriesType.Column)
+						.AddYSeries(StatesRateHistory, name: "States / Sec", seriesType: Util.SeriesType.Line, useSecondaryYAxis: true)
+						.ToXRoundedBitmap(600, 400),
+				};
+			}
+		}
+	}
 	
 	public IEnumerable<TAct>? Search(TState state, History<TAct> history) {
-		if (Goal(state)) return history;
-		
-		if (Seen?.Contains(state) == true) return null;
-		Seen?.Add(state);
-		if (DumpContainer is object) DumpContainer.Content = state;
+		if (Seen?.Add(state) == false) return null;
+
+		bool goal = Goal(state);
+		StatesEvaluated++;
+		LongestHistory = Max(LongestHistory, history.Length);
+		DumpState(goal, state, history);
+		if (goal) return history;
 		
 		foreach (var act in Acts) {
 			if (ActFilters.Any(af => !af(state, act))) continue;
@@ -382,18 +419,49 @@ public static class BreadthFirst {
 }
 
 public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
+	private TimeSpan LastReport = TimeSpan.Zero;
+
 	public BreadthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
 	
-	public override IEnumerable<TAct>? Search() {
+	private List<double> StatesRateHistory = new List<double>();
+	private List<int> HistoryLengthHistory = new List<int>();
+	private List<int> QueueDepthHistory = new List<int>();
+	private List<double> ElapsedHistory = new List<double>();
+	private void DumpState(bool forceShow, TState state, History<TAct> history, int queueDepth) {
+		if (DumpContainer is object) {
+			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
+				StatesRateHistory.Add(StatesEvaluated / this.Timer.Elapsed.TotalSeconds);
+				HistoryLengthHistory.Add(history.Length);
+				QueueDepthHistory.Add(queueDepth);
+				ElapsedHistory.Add(this.Timer.Elapsed.TotalSeconds);
+				
+				DumpContainer.Content = new { 
+					State = state, 
+					StatesEvaluated,
+					HistoryLength = history.Length,
+					QueueDepth = queueDepth,
+					LastReport = LastReport = this.Timer.Elapsed,
+					Status = ElapsedHistory.Chart()
+						.AddYSeries(QueueDepthHistory, name: "Queue Depth", seriesType: Util.SeriesType.Line)
+						.AddYSeries(HistoryLengthHistory, name: "History Length", seriesType: Util.SeriesType.Line)
+						.AddYSeries(StatesRateHistory, name: "States / Sec", seriesType: Util.SeriesType.Line, useSecondaryYAxis: true)
+						.ToXRoundedBitmap(600, 400)
+				};
+			}
+		}
+	}
+	
+	public override IEnumerable<TAct>? SearchCore() {
 		var queue = new Queue<(TState, History<TAct>)>();
 		
 		for (queue.Enqueue((Start, History<TAct>.Empty)); queue.TryDequeue(out var element); ) {
 			var (state, history) = element;
-			if (Goal(state)) return history;
+			if (Seen?.Add(state) == false) continue;
 
-			if (Seen?.Contains(state) == true) continue;
-			Seen?.Add(state);
-			if (DumpContainer is object) DumpContainer.Content = state;
+			bool goal = Goal(state);
+			this.StatesEvaluated++;
+			DumpState(goal, state, history, queue.Count);
+			if (goal) return history;
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -528,6 +596,17 @@ static IEnumerable<T[]> Choose<T>(IEnumerable<T> values, int choose) {
 }
 
 public static class Extensions {
+	public static Bitmap ToXRoundedBitmap(this LINQPad.LINQPadChart @this, int width, int height) {
+		var chart = @this.ToWindowsChart();
+				
+		chart.ChartAreas[0].AxisX.RoundAxisValues();
+		chart.Size = new Size(width, height);
+		
+		var bitmap = new Bitmap(width, height);
+		chart.DrawToBitmap(bitmap, new Rectangle(0, 0, width, height));
+		return bitmap;
+	}
+
 	public static IEnumerable<List<T>> BatchBy<T>(this IEnumerable<T> @this, int size) {
 		var current = new List<T>();
 		foreach (var element in @this) {
@@ -588,4 +667,6 @@ public static class Extensions {
 	
 	public static Dictionary<TKey, TValue> Clone<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> @this) where TKey: notnull
 		=> new Dictionary<TKey, TValue>(@this);
+		
+	public static Lazy<T> ToLazy<T>(this T @this) => new Lazy<T>(@this);
 }
