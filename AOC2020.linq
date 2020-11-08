@@ -344,8 +344,8 @@ public abstract class SearchBase<TState, TAct> {
 		return this;
 	}
 
-	public SearchBase<TState, TAct> SetDumpContainer(DumpContainer dumpContainer) {
-		this.DumpContainer = dumpContainer;
+	public SearchBase<TState, TAct> SetDumpContainer(DumpContainer? dumpContainer = null) {
+		this.DumpContainer = dumpContainer ?? new DumpContainer().Dump();
 		return this;
 	}
 	
@@ -549,6 +549,12 @@ static long[] ReadLongs() {
 static Board ReadBoard() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
 	return new Board(File.ReadAllText(filename));
+}
+
+static int Hash(params object[] objects) {
+	int hash = 0;
+	foreach (var obj in objects) hash = hash * 37 ^ obj.GetHashCode();
+	return hash;
 }
 
 public class ListComparer<T> : IEqualityComparer<IReadOnlyList<T>> {
