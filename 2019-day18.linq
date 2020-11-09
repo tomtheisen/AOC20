@@ -9,29 +9,30 @@
 #load ".\IntCode" 
 #load ".\AOC2020"
 
+static bool IsDoor(char tile) => tile >= 'A' && tile <= 'Z';
+static bool IsKey(char tile) => tile >= 'a' && tile <= 'z';
+
 void Main() {
 	var board = ReadBoard();
-	
 	var boardContainer = new DumpContainer(board);
 	
 	bool modified;
 	do {
 		modified = false;
 		foreach (var p in board) {
-			if (board[p]=='.' && Direction.Cardinal.Count(c => board[p.Move(c)] == '#') == 3) {
+			if (board[p]=='.' | IsDoor(board[p]) && Direction.Cardinal.Count(c => board[p.Move(c)] == '#') == 3) {
 				modified = true;
 				board = board.With(p, '#');
 			}
 		}
-	} while (!modified);
-	
+	} while (modified);
 	board.Dump("board");
 	
 	var pos = board.Find("@");
 	boardContainer.Content = board = board.With(pos, '.');
 	
 	int goalKeys = board.Aggregate(0, 
-		(acc, pos) => board[pos] >= 'a' && board[pos] <= 'z' ? (1 << board[pos] - 'a' | acc) : acc)
+		(acc, pos) => IsKey(board[pos]) ? (1 << board[pos] - 'a' | acc) : acc)
 		.Dump("Goal Keys Mask");
 
 	//*
@@ -39,7 +40,7 @@ void Main() {
 		.AddStateFilter(state => {
 			char tile = board[state.Position];
 			if (tile == '#') return false;
-			if (tile >= 'A' && tile <= 'Z') return (state.Keys >> tile - 'A' & 1) > 0;
+			if (IsDoor(tile)) return (state.Keys >> tile - 'A' & 1) > 0;
 			return true;
 		})
 		.SetGoal(state => state.Keys == goalKeys)
@@ -47,7 +48,7 @@ void Main() {
 			var newPos = state.Position.Move(dir);
 			var tile = board[newPos];
 			int newKeys = state.Keys;
-			if (tile >= 'a' && tile <= 'z') newKeys |= 1<< tile - 'a';
+			if (IsKey(tile)) newKeys |= 1<< tile - 'a';
 			return new { Position = newPos, Keys = newKeys };
 		})
 		.DetectLoops()
@@ -72,7 +73,7 @@ void Main() {
 		.AddActFilter ((state, act) => {
 			if (act < '9') {
 				if (state.ActiveIndex == 0) return true;
-				if (board[state.ActivePosition] is char c && c >= 'a' && c <= 'z') return true;
+				if (IsKey(board[state.ActivePosition])) return true;
 				return false;
 			}
 			else {
@@ -88,7 +89,7 @@ void Main() {
 			var dir = act switch { 'N' => Direction.N, 'E' => Direction.E, 'W' => Direction.W, 'S' => Direction.S };
 			var newPos = state.ActivePosition.Move(dir);
 			var destTile = board[newPos];
-			if (destTile >= 'a' && destTile <= 'z') {
+			if (IsKey(destTile)) {
 				state.Keys |= 1 << destTile - 'a';
 				state.KeyCount = BitOperations.PopCount((uint)state.Keys);
 				if (state.KeyCount > bestKeys) bestKeysContainer.Content = bestKeys = state.KeyCount;
@@ -99,7 +100,7 @@ void Main() {
 		.AddStateFilter(state => {
 			var tile = board[state.ActivePosition];
 			if (tile == '#') return false;
-			if (tile >= 'A' && tile <= 'Z') return (state.Keys >> tile - 'A' & 1) > 0;
+			if (IsDoor(tile)) return (state.Keys >> tile - 'A' & 1) > 0;
 			return true;
 		})
 		.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
