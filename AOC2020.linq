@@ -316,7 +316,7 @@ public abstract class SearchBase<TState, TAct> {
 	public List<Func<TState, TAct, bool>> ActFilters { get; } = new List<Func<TState, TAct, bool>>();
 	public List<Predicate<TState>> StateFilters { get; } = new List<Predicate<TState>>();
 	public Func<TState, TAct, TState> Transition { get; set; }
-	public HashSet<TState>? Seen { get; set; }
+	public IMembership<TState>? Seen { get; set; }
 	public TState Start { get; set; }
 	public DumpContainer? DumpContainer { get; set; }
 	public int StatesEvaluated { get; protected set; }
@@ -350,7 +350,12 @@ public abstract class SearchBase<TState, TAct> {
 	}
 	
 	public SearchBase<TState, TAct> DetectLoops() {
-		this.Seen = new HashSet<TState>();
+		this.Seen = new CollectionMembershipAdapter<TState>(new HashSet<TState>());
+		return this;
+	}
+	
+	public SearchBase<TState, TAct> DetectLoops<TDupe>(Func<TState, TDupe> dupeMap) {
+		this.Seen = new MappedMembership<TState, TDupe>(dupeMap);
 		return this;
 	}
 
@@ -359,11 +364,11 @@ public abstract class SearchBase<TState, TAct> {
 		return this;
 	}
 	
-	public IEnumerable<TAct>? Search() {
+	public History<TAct>? Search() {
 		this.Timer.Start();
 		return this.SearchCore();
 	}
-	public abstract IEnumerable<TAct>? SearchCore();
+	public abstract History<TAct>? SearchCore();
 }
 
 public static class DepthFirst {
@@ -377,7 +382,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 
 	public DepthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
 	
-	public override IEnumerable<TAct>? SearchCore() => Search(Start, new History<TAct>());
+	public override History<TAct>? SearchCore() => Search(Start, new History<TAct>());
 	
 	private List<double> StatesRateHistory = new List<double>();
 	private List<int> LongestHistoryLengthHistory = new List<int>();
@@ -402,7 +407,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		}
 	}
 	
-	public IEnumerable<TAct>? Search(TState state, History<TAct> history) {
+	public History<TAct>? Search(TState state, History<TAct> history) {
 		if (Seen?.Add(state) == false) return null;
 
 		bool goal = Goal(state);
@@ -417,7 +422,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			if (newState is null) continue;
 			if (StateFilters.Any(sf => !sf(newState))) continue;
 			var newHistory = history.AndThen(act);
-			if (Search(newState, newHistory) is IEnumerable<TAct> result) return result;
+			if (Search(newState, newHistory) is History<TAct> result) return result;
 		}
 		return null;
 	}
@@ -461,7 +466,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		}
 	}
 	
-	public override IEnumerable<TAct>? SearchCore() {
+	public override History<TAct>? SearchCore() {
 		var queue = new Queue<(TState, History<TAct>)>();
 		
 		for (queue.Enqueue((Start, History<TAct>.Empty)); queue.TryDequeue(out var element); ) {
@@ -499,7 +504,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 	public Dijkstra(TState start, Func<TState, IComparable> getCost, IList<TAct> acts) 
 		: base(start, acts) => GetCost = getCost;
 
-	public override IEnumerable<TAct>? SearchCore() {
+	public override History<TAct>? SearchCore() {
 		var agenda = new PriorityQueue<(TState State, History<TAct> History)>(t => GetCost(t.State), direction: -1, (Start, History<TAct>.Empty));
 
 		while (agenda.Count > 0) {
@@ -695,6 +700,37 @@ static IEnumerable<T[]> Choose<T>(IEnumerable<T> values, int choose) {
 	foreach (var choice in Choose(values.Skip(1), choose)) yield return choice;
 }
 
+public interface IMembership<T> {
+	bool Add(T item);
+	bool Contains(T item);
+	void Clear();
+}
+
+public class CollectionMembershipAdapter<T> : IMembership<T> {
+	private ISet<T> Collection;
+	
+	public CollectionMembershipAdapter(ISet<T> collection) {
+		Collection = collection;
+	}
+
+	public bool Add(T item) => Collection.Add(item);
+	public bool Contains(T item) => Collection.Contains(item);
+	public void Clear() => Collection.Clear();
+}
+
+public class MappedMembership<T, TMap> : IMembership<T> {
+	private HashSet<TMap> MapSet = new HashSet<TMap>();
+	private Func<T, TMap> MapFunc;
+	
+	public MappedMembership(Func<T, TMap> map) {
+		MapFunc = map;
+	}
+
+	public bool Add(T item) => MapSet.Add(MapFunc(item));
+	public void Clear() => MapSet.Clear();
+	public bool Contains(T item) => MapSet.Contains(MapFunc(item));
+}
+
 public static class Extensions {
 	public static Bitmap ToXRoundedBitmap(this LINQPad.LINQPadChart @this, int width, int height) {
 		var chart = @this.ToWindowsChart();
@@ -769,4 +805,6 @@ public static class Extensions {
 		=> new Dictionary<TKey, TValue>(@this);
 		
 	public static Lazy<T> ToLazy<T>(this T @this) => new Lazy<T>(@this);
+	
+	public static T? ToNullable<T>(this T @this) where T : struct => @this;
 }

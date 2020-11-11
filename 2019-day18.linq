@@ -28,7 +28,7 @@ void Main() {
 			}
 		}
 	} while (modified);
-	board.Dump("board");
+	board.ToLazy().Dump("board");
 	
 	var pos = board.Find("@");
 	boardContainer.Content = board = board.With(pos, '.');
@@ -37,8 +37,8 @@ void Main() {
 		(acc, pos) => IsKey(board[pos]) ? (1 << board[pos] - 'a' | acc) : acc)
 		.Dump("Goal Keys Mask");
 
-	/*
-	BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
+	//*
+	var part1Path = BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 		.AddStateFilter(state => {
 			char tile = board[state.Position];
 			if (tile == '#') return false;
@@ -55,10 +55,57 @@ void Main() {
 		})
 		.DetectLoops()
 		.SetDumpContainer(new DumpContainer{ DumpDepth = 3 }.Dump("BFS"))
-		.Search()
-		.Count()
-		.Dump("Part 1");
+		.Search();
+	
+	part1Path.Count().Dump("Part 1");
 	//*/
+	
+	{
+		/*
+		var p = pos;
+		var keyOrder = "";
+		int steps = 0;
+		foreach (var d in part1Path) {
+			p = p.Move(d);
+			++steps;
+			if (board[p] >= 'a' && board[p] <= 'z' && !keyOrder.Contains(board[p])) keyOrder += board[p] + " " + steps + "\n";
+		}
+		Console.WriteLine(keyOrder);
+		//*/
+	}
+	
+	//*
+	var doors = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
+	var keys = "abcdefghijklmnopqrstuvwxyz".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
+	
+	var psearch = Dijkstra.Create((pos, board, keys: 0, moves: 0), state => state.moves, "abcdefghijklmnopqrstuvwxyz".ToCharArray())
+		.SetDumpContainer()
+		.SetGoal(state => state.keys == goalKeys)
+		.AddActFilter ((state, act) => ((state.keys >> act - 'a') & 1) == 0)
+		.SetTransition ((state, act) => {
+			var path = BreadthFirst.Create(state.pos, Direction.Cardinal)
+				.SetTransition((s, d) => s.Move(d))
+				.AddStateFilter(s => state.board[s] == '.' || state.board[s] == act)
+				.SetGoal(s => s.Equals(keys[act]))
+				.DetectLoops()
+				.Search();
+			if (path is null) return default;
+			
+			var newPos = state.pos;
+			foreach (var step in path) newPos = newPos.Move(step);
+			
+			var newBoard = state.board.With(newPos, '.');
+			if (doors.TryGetValue(char.ToUpper(act), out var doorPos)) newBoard = newBoard.With(doorPos, '.');
+			
+			return (newPos, newBoard, state.keys | (1 << act - 'a'), state.moves + path.Length);
+		})
+		.AddStateFilter(state => state.board is object)
+		.DetectLoops(state => new { state.pos, state.keys });
+		
+		psearch.Search().Dump();
+	//*/	
+
+	return;
 	
 	board = board.With(pos, '#');
 	foreach (var dir in Direction.Cardinal) board = board.With(pos.Move(dir), '#');
@@ -116,7 +163,7 @@ void Main() {
 			if (tile == '#' || IsDoor(tile)) return false;
 			return true;
 		})
-		//.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
+		.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
 		.SetGoal(state => state.Keys == goalKeys)
 		.SetDumpContainer()
 		.DetectLoops()
