@@ -11,6 +11,8 @@
 
 static bool IsDoor(char tile) => tile >= 'A' && tile <= 'Z';
 static bool IsKey(char tile) => tile >= 'a' && tile <= 'z';
+static bool IsDeadEnd(Board b, Position p)
+	=> b[p]=='.' | IsDoor(b[p]) && Direction.Cardinal.Count(c => b[p.Move(c)] == '#') == 3;
 
 void Main() {
 	var board = ReadBoard();
@@ -20,7 +22,7 @@ void Main() {
 	do {
 		modified = false;
 		foreach (var p in board) {
-			if (board[p]=='.' | IsDoor(board[p]) && Direction.Cardinal.Count(c => board[p.Move(c)] == '#') == 3) {
+			if (IsDeadEnd(board, p)) {
 				modified = true;
 				board = board.With(p, '#');
 			}
@@ -35,7 +37,7 @@ void Main() {
 		(acc, pos) => IsKey(board[pos]) ? (1 << board[pos] - 'a' | acc) : acc)
 		.Dump("Goal Keys Mask");
 
-	//*
+	/*
 	BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 		.AddStateFilter(state => {
 			char tile = board[state.Position];
@@ -66,6 +68,7 @@ void Main() {
 		Position2 = pos.Up().Right(),
 		Position3 = pos.Down().Left(),
 		Position4 = pos.Down().Right(),
+		Board = board,
 	};
 	int bestKeys = 0;
 	var bestKeysContainer = new DumpContainer().Dump("Best Keys");
@@ -73,7 +76,7 @@ void Main() {
 		.AddActFilter ((state, act) => {
 			if (act < '9') {
 				if (state.ActiveIndex == 0) return true;
-				if (IsKey(board[state.ActivePosition])) return true;
+				if (state.GotKey) return true;
 				return false;
 			}
 			else {
@@ -88,22 +91,32 @@ void Main() {
 			}
 			var dir = act switch { 'N' => Direction.N, 'E' => Direction.E, 'W' => Direction.W, 'S' => Direction.S };
 			var newPos = state.ActivePosition.Move(dir);
-			var destTile = board[newPos];
+			if (IsDeadEnd(state.Board, state.ActivePosition)) {
+				state.Board = state.Board.With(state.ActivePosition, '#');
+			}
+			
+			state.GotKey = false;
+			var destTile = state.Board[newPos];
 			if (IsKey(destTile)) {
 				state.Keys |= 1 << destTile - 'a';
 				state.KeyCount = BitOperations.PopCount((uint)state.Keys);
+				state.GotKey = true;
+				state.Board = state.Board.With(newPos, '.');
+				foreach (var doorPos in state.Board.FindAll(char.ToUpper(destTile))) {
+					state.Board = state.Board.With(doorPos, '.'); // open door
+				}
+				
 				if (state.KeyCount > bestKeys) bestKeysContainer.Content = bestKeys = state.KeyCount;
 			}
 			state.ActivePosition = newPos;
 			return state;
 		})
 		.AddStateFilter(state => {
-			var tile = board[state.ActivePosition];
-			if (tile == '#') return false;
-			if (IsDoor(tile)) return (state.Keys >> tile - 'A' & 1) > 0;
+			var tile = state.Board[state.ActivePosition];
+			if (tile == '#' || IsDoor(tile)) return false;
 			return true;
 		})
-		.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
+		//.AddStateFilter(state => state.KeyCount >= bestKeys - 5)
 		.SetGoal(state => state.Keys == goalKeys)
 		.SetDumpContainer()
 		.DetectLoops()
@@ -120,6 +133,8 @@ struct Quad {
 	public int Keys;
 	public int KeyCount;
 	public int ActiveIndex;
+	public Board Board;
+	public bool GotKey;
 	
 	public Position ActivePosition {
 		get => ActiveIndex switch { 1=>Position1, 2=>Position2, 3=>Position3, 4=>Position4 };
@@ -135,4 +150,12 @@ struct Quad {
 	
 	public override int GetHashCode() 
 		=> Hash(Position1, Position2, Position3, Position4, Keys, ActiveIndex);
+
+	public override bool Equals(object? obj) => obj is Quad q 
+		&& Position1.Equals(q.Position1) 
+		&& Position2.Equals(q.Position2) 
+		&& Position3.Equals(q.Position3) 
+		&& Position4.Equals(q.Position4)
+		&& Keys == q.Keys
+		&& ActiveIndex == q.ActiveIndex;
 }
