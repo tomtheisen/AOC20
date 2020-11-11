@@ -8,9 +8,9 @@
 #nullable enable
 
 void Main() {
-	"foobar".BatchBy(3).Transpose().Dump("batch");
-	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump("permutations");
-	Choose("abcde", 2).Select(x => string.Concat(x)).Dump("choose");
+	"foobar".BatchBy(3).Transpose().Dump("batch", 0);
+	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump("permutations", 0);
+	Choose("abcde", 2).Select(x => string.Concat(x)).Dump("choose", 0);
 
 	var maze = new Board(@"
 		XXXXXXXXXXXXXXXX
@@ -33,7 +33,7 @@ void Main() {
 		.AddStateFilter(maze.Contains)
 		.AddStateFilter(pos => maze[pos] != 'X')
 		.DetectLoops()
-		.SetDumpContainer(new DumpContainer().Dump())
+		.SetDumpContainer(new DumpContainer{ DumpDepth=1 }.Dump(0))
 		.Search();
 		
 	foreach (var step in path!) 
@@ -41,7 +41,7 @@ void Main() {
 			.With(start = start + step, '.')
 			//.Materialize()
 			;
-	maze.Materialize().Dump("DFS");
+	maze.Materialize().Dump("DFS",0);
 	
 	new Board()
 		.With(-5, 0, 'W')
@@ -58,10 +58,18 @@ void Main() {
 	string.Concat(binary!).Dump("Binary: " + SomeNumber);
 
 	Console.WriteLine("Priority Queue");
-	var q = new PriorityQueue<int>(n => n, Enumerable.Repeat(new Random(), 100).Select(rng => rng.Next(100)));
+	var q = new PriorityQueue<int>(n => n, direction: -1, Enumerable.Repeat(new Random(), 100).Select(rng => rng.Next(100)));
 	while (q.Count > 0) Console.WriteLine(q.Pop());
 	
 	new Board(".").With(0, -1, '#').With(0, 1, '#').Materialize().With(-1, 0, '.').Dump();
+	
+	Dijkstra.Create(1u, s => BitOperations.PopCount(s), new[] {0u,1u})
+		.SetTransition ((state, act) => 2 * state + act)
+		.DetectLoops()
+		.SetGoal(state => state == 7)
+		.SetDumpContainer()
+		.Search()
+		.Dump("how to make 7");
 }
 
 struct Direction : IEquatable<Direction> {
@@ -263,7 +271,9 @@ class Board : IEnumerable<Position> {
 	IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 	
 	public IEnumerable<Position> FindAll(string needles) => this.Where(t => needles.Contains(this[t]));
+	public IEnumerable<Position> FindAll(char needle) => this.Where(t => needle == this[t]);
 	public Position Find(string needles) => this.First(t => needles.Contains(this[t]));
+	public Position Find(char needle) => this.First(t => needle == this[t]);
 	
 	public string ToDump() {
 		var sb = new StringBuilder();
@@ -477,23 +487,92 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 	}
 }
 
+public static class Dijkstra {
+	public static Dijkstra<TState, TAct> Create<TState, TAct>(TState start, Func<TState, IComparable> getCost, IList<TAct> acts)
+		=> new Dijkstra<TState, TAct>(start, getCost, acts);
+}
+
+public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
+	private TimeSpan LastReport = TimeSpan.Zero;
+	private Func<TState, IComparable> GetCost;
+
+	public Dijkstra(TState start, Func<TState, IComparable> getCost, IList<TAct> acts) 
+		: base(start, acts) => GetCost = getCost;
+
+	public override IEnumerable<TAct>? SearchCore() {
+		var agenda = new PriorityQueue<(TState State, History<TAct> History)>(t => GetCost(t.State), direction: -1, (Start, History<TAct>.Empty));
+
+		while (agenda.Count > 0) {
+			var (state, history) = agenda.Pop();
+			if (Seen?.Add(state) == false) continue;
+			
+			bool goal = Goal(state);
+			this.StatesEvaluated++;
+			DumpState(goal, state, agenda.Count);
+			if (goal) return history;
+			
+			foreach (var act in Acts) {
+				if (ActFilters.Any(af => !af(state, act))) continue;
+				var newState = Transition(state, act);
+				if (newState is null) continue;
+				if (StateFilters.Any(sf => !sf(newState))) continue;
+				var newHistory = history.AndThen(act);
+				agenda.Add((newState, newHistory));
+			}
+		}
+		return null;
+	}
+
+	private List<double> StatesRateHistory = new List<double>();
+	private List<int> AgendaSizeHistory = new List<int>();
+	private List<double> ElapsedHistory = new List<double>();
+	private void DumpState(bool forceShow, TState state, int agendaSize) {
+		if (DumpContainer is object) {
+			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
+				StatesRateHistory.Add(StatesEvaluated / this.Timer.Elapsed.TotalSeconds);
+				AgendaSizeHistory.Add(agendaSize);
+				ElapsedHistory.Add(this.Timer.Elapsed.TotalSeconds);
+				
+				DumpContainer.Content = new {
+					State = state,
+					StatesEvaluated,
+					AgendaSize = agendaSize,
+					LastReport = LastReport = this.Timer.Elapsed,
+					Status = ElapsedHistory.Chart()
+						.AddYSeries(AgendaSizeHistory, name: "Agenda Size", seriesType: Util.SeriesType.Line)
+						.AddYSeries(StatesRateHistory, name: "States / Sec", seriesType: Util.SeriesType.Line, useSecondaryYAxis: true)
+						.ToXRoundedBitmap(600, 400),
+				};
+			}
+		}
+	}
+}
+
 public class PriorityQueue<T> {
 	private List<(T Element, IComparable Priority)> Items = new List<(T, IComparable)>();
 	private readonly Func<T, IComparable> GetPriority;
 	
+	public int Direction { get; }
+	
 	public int Count => Items.Count;
 	
-	public PriorityQueue(Func<T, IComparable> priority) => GetPriority = priority;
+	public PriorityQueue(Func<T, IComparable> priority, int direction = 1) {
+		GetPriority = priority;
+		Direction = direction;
+	}
 
-	public PriorityQueue(Func<T, IComparable> priority, IEnumerable<T> elements) 
-		: this(priority) => AddAll(elements);
+	public PriorityQueue(Func<T, IComparable> priority, int direction, IEnumerable<T> elements) 
+		: this(priority, direction) => AddAll(elements);
+
+	public PriorityQueue(Func<T, IComparable> priority, int direction, params T[] elements) 
+		: this(priority, direction) => AddAll(elements);
 
 	public void Add(T element) {
 		Items.Add((element, GetPriority(element)));
 		
 		for (int child = Count - 1, parent; child > 0; child = parent) {
 			parent = child - 1 >> 1;
-			if (Items[child].Priority.CompareTo(Items[parent].Priority) <= 0) break;
+			if (Items[child].Priority.CompareTo(Items[parent].Priority) * Direction <= 0) break;
 			(Items[child], Items[parent]) = (Items[parent], Items[child]);
 		}
 	}
@@ -507,7 +586,7 @@ public class PriorityQueue<T> {
 		
 		int child = 1, parent = 0;
 		for (; child < Count; parent = child, parent = child, child = 2 * child + 1) {
-			if (child < Count - 1 && Items[child].Priority.CompareTo(Items[child + 1].Priority) < 0) ++child;
+			if (child < Count - 1 && Items[child].Priority.CompareTo(Items[child + 1].Priority) * Direction < 0) ++child;
 			Items[parent] = Items[child];
 		}
 		
@@ -517,11 +596,22 @@ public class PriorityQueue<T> {
 		
 		for (child = parent; child > 0; child = parent) {
 			parent = child - 1 >> 1;
-			if (Items[child].Priority.CompareTo(Items[parent].Priority) <= 0) break;
+			if (Items[child].Priority.CompareTo(Items[parent].Priority) * Direction <= 0) break;
 			(Items[child], Items[parent]) = (Items[parent], Items[child]);
 		}
 		return result;
 	}
+	
+	public bool TryPop(out T result) {
+		if (this.Count == 0) {
+			result = default;
+			return false;
+		}
+		result = Pop();
+		return true;
+	}
+	
+	public T Peek() => Items[0].Element;
 }
 
 static string ReadString() {
@@ -556,6 +646,10 @@ static int Hash(params object[] objects) {
 	foreach (var obj in objects) hash = hash * 37 ^ obj.GetHashCode();
 	return hash;
 }
+
+int GCD(int a, int b) => a == 0 ? Abs(b) : GCD(Abs(b) % a, Abs(a));
+long GCD(long a, long b) => a == 0 ? Abs(b) : GCD(Abs(b) % a, Abs(a));
+BigInteger GCD(BigInteger a, BigInteger b) => a == 0 ? BigInteger.Abs(b) : GCD(BigInteger.Abs(b) % a, BigInteger.Abs(a));
 
 public class ListComparer<T> : IEqualityComparer<IReadOnlyList<T>> {
 	public bool Equals(IReadOnlyList<T>? x, IReadOnlyList<T>? y)
