@@ -12,32 +12,39 @@
 static bool IsDoor(char tile) => tile >= 'A' && tile <= 'Z';
 static bool IsKey(char tile) => tile >= 'a' && tile <= 'z';
 static bool IsDeadEnd(Board b, Position p)
-	=> b[p]=='.' | IsDoor(b[p]) && Direction.Cardinal.Count(c => b[p.Move(c)] == '#') == 3;
+	=> b[p]=='.' | IsDoor(b[p]) && p.Adjacent().Count(a => b[a] == '#') == 3;
+
+static Board FillDeadEnd(Board board, Position pos, Position? pinned = null) {
+    char tile = board[pos];
+    if (tile != '.' && !IsDoor(tile)) return board;
+    if (pos == pinned) return board;
+    
+    Position? wayout = null;
+    foreach (var neighbor in pos.Adjacent()) {
+        tile = board[neighbor];
+        if (tile == '.' || IsDoor(tile) || IsKey(tile)) {
+            if (wayout != null) return board; // multiple ways out
+            wayout = neighbor;
+        }
+    }
+    return FillDeadEnd(board.With(pos, '#'), wayout.Value).Materialize();
+}
 
 void Main() {
 	var board = ReadBoard();
-	var boardContainer = new DumpContainer(board);
-	
-	bool modified;
-	do {
-		modified = false;
-		foreach (var p in board) {
-			if (IsDeadEnd(board, p)) {
-				modified = true;
-				board = board.With(p, '#');
-			}
-		}
-	} while (modified);
+    foreach(var p in board) board = FillDeadEnd(board, p);
 	board.ToLazy().Dump("board");
 	
 	var pos = board.Find("@");
-	boardContainer.Content = board = board.With(pos, '.');
 	
 	int goalKeys = board.Aggregate(0, 
 		(acc, pos) => IsKey(board[pos]) ? (1 << board[pos] - 'a' | acc) : acc)
 		.Dump("Goal Keys Mask");
 
-	//*
+	// BFS over positions and moves
+    //
+    
+    /*
 	var part1Path = BreadthFirst.Create(new { Position = pos, Keys = 0 }, Direction.Cardinal)
 		.AddStateFilter(state => {
 			char tile = board[state.Position];
@@ -58,57 +65,83 @@ void Main() {
 		.Search();
 	
 	part1Path.Count().Dump("Part 1");
-	//*/
+    //*/
 	
-	{
-		/*
-		var p = pos;
-		var keyOrder = "";
-		int steps = 0;
-		foreach (var d in part1Path) {
-			p = p.Move(d);
-			++steps;
-			if (board[p] >= 'a' && board[p] <= 'z' && !keyOrder.Contains(board[p])) keyOrder += board[p] + " " + steps + "\n";
-		}
-		Console.WriteLine(keyOrder);
-		//*/
-	}
+	// Priority search over key-seeking
+    //
+	var doorPos = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
+	var keyPos = "abcdefghijklmnopqrstuvwxyz".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
 	
-	//*
-	var doors = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
-	var keys = "abcdefghijklmnopqrstuvwxyz".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
-	
-	var psearch = Dijkstra.Create((pos, board, keys: 0, moves: 0), state => state.moves, "abcdefghijklmnopqrstuvwxyz".ToCharArray())
-		.SetDumpContainer()
+    //*
+	Dijkstra.Create((pos, board, keys: 0, moves: 0), state => state.moves, "abcdefghijklmnopqrstuvwxyz".ToCharArray())
+		.SetDumpContainer(new DumpContainer().Dump("Dijkstra search"))
 		.SetGoal(state => state.keys == goalKeys)
 		.AddActFilter ((state, act) => ((state.keys >> act - 'a') & 1) == 0)
 		.SetTransition ((state, act) => {
 			var path = BreadthFirst.Create(state.pos, Direction.Cardinal)
 				.SetTransition((s, d) => s.Move(d))
 				.AddStateFilter(s => state.board[s] == '.' || state.board[s] == act)
-				.SetGoal(s => s.Equals(keys[act]))
+				.SetGoal(s => s.Equals(keyPos[act]))
 				.DetectLoops()
-				.Search();
+				.Search(out var newPos);
 			if (path is null) return default;
 			
-			var newPos = state.pos;
-			foreach (var step in path) newPos = newPos.Move(step);
-			
 			var newBoard = state.board.With(newPos, '.');
-			if (doors.TryGetValue(char.ToUpper(act), out var doorPos)) newBoard = newBoard.With(doorPos, '.');
+			if (doorPos.TryGetValue(char.ToUpper(act), out var d)) newBoard = newBoard.With(d, '.');
+            
+            newBoard = FillDeadEnd(newBoard, state.pos, newPos).Materialize();
 			
 			return (newPos, newBoard, state.keys | (1 << act - 'a'), state.moves + path.Length);
 		})
 		.AddStateFilter(state => state.board is object)
-		.DetectLoops(state => new { state.pos, state.keys });
-		
-		psearch.Search().Dump();
-	//*/	
+		.DetectLoops(state => new { state.pos, state.keys })
+		.Search(out var p1state);
+
+        p1state.moves.Dump("Dijkstra Part 1");
+    //*/
+
+    // Priority lookups over key-seeking
+    var paths = new Dictionary<(char, char), (int Distance, int KeysNeeded)>();
+    for (char startKey = '@'; startKey <= 'z'; startKey++, startKey |= ' ') {
+        var startPos = board.Find(startKey);
+        BreadthFirst.Create((pos: startPos, moves: 0, keysNeeded: 0), Direction.Cardinal)
+            .DetectLoops(state => state.pos)
+            .SetGoal(_ => false)
+            .AddStateFilter(state => board[state.pos] != '#')
+            .SetTransition((state, act) => {
+                int newKeysNeeded = state.keysNeeded;
+                char tile = board[state.pos];
+                if (IsDoor(tile)) {
+                    newKeysNeeded |= 1 << tile - 'A';
+                }
+                else if (IsKey(tile)) {
+                    paths[(startKey, tile)] = (state.moves, state.keysNeeded);
+                }
+                return (state.pos.Move(act), state.moves + 1, newKeysNeeded);
+            })
+            .Search();
+    }
+
+	Dijkstra.Create((pos, keys: 0, moves: 0), state => state.moves, "abcdefghijklmnopqrstuvwxyz".ToCharArray())
+		.SetDumpContainer(new DumpContainer().Dump("Pre-moved Dijkstra search"))
+		.SetGoal(state => state.keys == goalKeys)
+		.AddActFilter ((state, act) => ((state.keys >> act - 'a') & 1) == 0)
+		.SetTransition ((state, act) => {
+			var path = paths[(board[state.pos], act)];
+            if ((path.KeysNeeded & state.keys) != path.KeysNeeded) return (default, -1 , -1);
+            for (int i = 0; i < 200_000; i++) { }
+			return (keyPos[act], state.keys | (1 << act - 'a'), state.moves + path.Distance);
+		})
+		.AddStateFilter(state => state.moves >= 0)
+		.DetectLoops(state => new { state.pos, state.keys })
+		.Search(out var premoves)
+        .Dump();
+    premoves.moves.Dump("Dijkstra pre-moves Part 1");
 
 	return;
 	
 	board = board.With(pos, '#');
-	foreach (var dir in Direction.Cardinal) board = board.With(pos.Move(dir), '#');
+	foreach (var neighbor in pos.Adjacent()) board = board.With(neighbor, '#');
 	
 	var start = new Quad { 
 		Position1 = pos.Up().Left(),

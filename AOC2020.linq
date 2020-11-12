@@ -215,7 +215,7 @@ class Board : IEnumerable<Position> {
 			if (!Contains(x, y)) return ' ';
 			if (Cells is object) return Cells[x - Left, y - Top];
 			if (x == ChangedPosition?.X && y == ChangedPosition?.Y) return NewChar!.Value;
-			if (++Misses > 2 * Width * Height) {
+			if (++Misses > Width * Height) {
 				Materialize();
 				return Cells![x - Left, y - Top];
 			}
@@ -281,6 +281,8 @@ class Board : IEnumerable<Position> {
 			for (int x = Left; x < Right; x++) sb.Append(this[x, y]);
 		return sb.ToString();
 	}
+
+    public override string ToString() => $"Board ({Width} x {Height})";
 }
 
 public class History<T> : IEnumerable<T> {
@@ -364,11 +366,12 @@ public abstract class SearchBase<TState, TAct> {
 		return this;
 	}
 	
-	public History<TAct>? Search() {
+	public History<TAct>? Search(out TState finalState) {
 		this.Timer.Start();
-		return this.SearchCore();
+		return this.SearchCore(out finalState);
 	}
-	public abstract History<TAct>? SearchCore();
+	public History<TAct>? Search() => this.Search(out _);
+	public abstract History<TAct>? SearchCore(out TState finalState);
 }
 
 public static class DepthFirst {
@@ -382,7 +385,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 
 	public DepthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
 	
-	public override History<TAct>? SearchCore() => Search(Start, new History<TAct>());
+	public override History<TAct>? SearchCore(out TState finalState) => SearchCore(Start, new History<TAct>(), out finalState);
 	
 	private List<double> StatesRateHistory = new List<double>();
 	private List<int> LongestHistoryLengthHistory = new List<int>();
@@ -407,14 +410,20 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		}
 	}
 	
-	public History<TAct>? Search(TState state, History<TAct> history) {
-		if (Seen?.Add(state) == false) return null;
+	public History<TAct>? SearchCore(TState state, History<TAct> history, out TState finalState) {
+		if (Seen?.Add(state) == false) {
+            finalState = default;
+            return null;
+        }
 
 		bool goal = Goal(state);
 		StatesEvaluated++;
 		LongestHistory = Max(LongestHistory, history.Length);
 		DumpState(goal, state, history);
-		if (goal) return history;
+		if (goal) {
+            finalState = state;
+            return history;
+        }
 		
 		foreach (var act in Acts) {
 			if (ActFilters.Any(af => !af(state, act))) continue;
@@ -422,8 +431,9 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			if (newState is null) continue;
 			if (StateFilters.Any(sf => !sf(newState))) continue;
 			var newHistory = history.AndThen(act);
-			if (Search(newState, newHistory) is History<TAct> result) return result;
+			if (SearchCore(newState, newHistory, out finalState) is History<TAct> result) return result;
 		}
+        finalState = default;
 		return null;
 	}
 }
@@ -466,7 +476,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 		}
 	}
 	
-	public override History<TAct>? SearchCore() {
+	public override History<TAct>? SearchCore(out TState finalState) {
 		var queue = new Queue<(TState, History<TAct>)>();
 		
 		for (queue.Enqueue((Start, History<TAct>.Empty)); queue.TryDequeue(out var element); ) {
@@ -476,7 +486,10 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			bool goal = Goal(state);
 			this.StatesEvaluated++;
 			DumpState(goal, state, history, queue.Count);
-			if (goal) return history;
+			if (goal) {
+                finalState = state;
+                return history;
+            }
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -487,7 +500,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 				queue.Enqueue((newState, newHistory));
 			}
 		}
-		
+		finalState = default;
 		return null;
 	}
 }
@@ -504,7 +517,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 	public Dijkstra(TState start, Func<TState, IComparable> getCost, IList<TAct> acts) 
 		: base(start, acts) => GetCost = getCost;
 
-	public override History<TAct>? SearchCore() {
+	public override History<TAct>? SearchCore(out TState finalState) {
 		var agenda = new PriorityQueue<(TState State, History<TAct> History)>(t => GetCost(t.State), direction: -1, (Start, History<TAct>.Empty));
 
 		while (agenda.Count > 0) {
@@ -514,17 +527,20 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 			bool goal = Goal(state);
 			this.StatesEvaluated++;
 			DumpState(goal, state, agenda.Count);
-			if (goal) return history;
+			if (goal) {
+                finalState = state;
+                return history;
+            }
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
 				var newState = Transition(state, act);
 				if (newState is null) continue;
 				if (StateFilters.Any(sf => !sf(newState))) continue;
-				var newHistory = history.AndThen(act);
-				agenda.Add((newState, newHistory));
+				agenda.Add((newState, history.AndThen(act)));
 			}
 		}
+        finalState = default;
 		return null;
 	}
 
