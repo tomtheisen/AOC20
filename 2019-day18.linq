@@ -42,6 +42,10 @@ void Main() {
                 char tile = board[state.pos];
                 if (IsDoor(tile)) newKeysNeeded |= 1 << tile - 'A';
                 else if (IsKey(tile) && tile != startKey) paths[(startKey, tile)] = (state.moves, state.keysNeeded);
+                
+                // moving past a key is inefficient unless you already have that key
+                if (IsKey(tile) && tile != startKey) newKeysNeeded |= 1 << tile - 'a'; 
+                
                 return (state.pos.Move(act), state.moves + 1, newKeysNeeded);
             })
 			.AddStateFilter(state => state.moves >= 0)
