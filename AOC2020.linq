@@ -261,6 +261,8 @@ class Board : IEnumerable<Position> {
 	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
 
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
+    
+    public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
 
 	public IEnumerator<Position> GetEnumerator() {
 		for (int y = Top; y < Bottom; y++)

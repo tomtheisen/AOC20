@@ -11,22 +11,20 @@
 
 var machine = new IntCodeMachine{ Output = _ => {} };
 
-{
-	long total = 0;
-	var board = new Board();
-	for (int x = 0; x < 50; x++) {
-		for (int y = 0; y < 50; y++) {
-			machine.Reset();
-			machine.TakeInput(x, y);
-			long output = machine.RunToNextOutputOrThrow();
-			total += output;
-			board = board.With(x, y, output > 0 ? '#' : ' ');
-		}
+long total = 0, output;
+var board = new Board(50, 50);
+for (int x = 0; x < 50; x++) {
+	for (int y = 0; y < 50; y++) {
+		machine.Reset();
+		machine.TakeInput(x, y);
+		total += output = machine.RunToNextOutputOrThrow();
+		board = board.With(x, y, " #"[(int)output]);
 	}
-	total.Dump("Part 1");
-	new{board}.Dump();
 }
+total.Dump("Part 1");
+new{board}.Dump();
 
+// (x, y) is lower left corner
 for (long x = 0, y = 100; ; y++) {
 	for (;; x++) {
 		machine.Reset();
