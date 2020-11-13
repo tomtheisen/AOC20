@@ -24,10 +24,29 @@ machine.Run();
 
 // part 2
 machine.Reset();
-machine.TakeInput("OR A J\n");
-machine.TakeInput("AND B J\n");
-machine.TakeInput("AND C J\n");
+machine.TakeInput("OR B J\n");
+machine.TakeInput("OR C J\n");
 machine.TakeInput("NOT J J\n");
+
+machine.TakeInput("OR E J\n");
+
+machine.TakeInput("OR C T\n");
+machine.TakeInput("OR E T\n");
+machine.TakeInput("OR F T\n");
+machine.TakeInput("NOT T T\n");
+machine.TakeInput("OR T J\n");
+
+machine.TakeInput("NOT A T\n");
+machine.TakeInput("OR T J\n");
+
+//machine.TakeInput("NOT E T\n");
+//machine.TakeInput("NOT T T\n");
+//machine.TakeInput("OR G T\n");
+//machine.TakeInput("OR I T\n");
+//machine.TakeInput("AND H T\n");
+//machine.TakeInput("OR T J\n");
+
+
 machine.TakeInput("AND D J\n");
 machine.TakeInput("RUN\n");
 machine.Run();
