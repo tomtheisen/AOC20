@@ -31,3 +31,48 @@ machine.TakeInput("NOT J J\n");
 machine.TakeInput("AND D J\n");
 machine.TakeInput("RUN\n");
 machine.Run();
+
+
+/*
+.	jump
+#
+	#.
+		#..
+			#...	stay
+			#..#	jump
+		#.#
+			#.#.	stay
+			#.##	jump
+	##
+		##.
+		   	##..	stay
+		   	##.#
+		   		##.#.
+		   		     	##.#..	jump
+		   		     	##.#.#	
+		   		     	      	##.#.#.
+		   		     	      	       	##.#.#.. stay
+		   		     	      	       	##.#.#.#
+		   		     	      	       		##.#.#.#.	??? 
+		   		     	      	       		##.#.#.##	jump
+		   		     	      	##.#.##	stay
+		   		##.##	jump
+		###	stay
+
+NOT A
+OR (
+	NOT B
+	OR 
+	B AND NOT C AND (
+		E
+		OR
+		NOT F
+		OR (
+			NOT G
+			AND
+			H
+		)
+	)
+)
+AND D
+*/
