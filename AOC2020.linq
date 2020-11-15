@@ -81,8 +81,8 @@ struct Direction : IEquatable<Direction> {
 	public override int GetHashCode() => (int)BitOperations.RotateRight((uint)DX, 16) ^ DY;
 	public bool Equals(Direction other) => other.DX == DX && other.DY == DY;
 
-	public static Direction Zero = new Direction(0, 0);
-	public static Direction N = new Direction(0, -1), E = new Direction(1, 0), S = new Direction(0, 1), W = new Direction(-1, 0);
+	public static Direction Zero = new(0, 0);
+	public static Direction N = new(0, -1), E = new(1, 0), S = new(0, 1), W = new(-1, 0);
 	public static Direction[] Cardinal = { N, E, S, W };
 	public static Direction NW = N + W, NE = N + E, SW = S + W, SE = S + E;
 	public static Direction[] InterCardinal = { N, NE, E, SE, S, SW, W, NW };
@@ -113,7 +113,7 @@ struct Position : IEquatable<Position> {
 	public Position(int x, int y) => (X, Y, Face) = (x, y, default);
 	public Position(int x, int y, Direction face) => (X, Y, Face) = (x, y, face);
 	
-	public static readonly Position Origin = new Position(0, 0);
+	public static readonly Position Origin = new(0, 0);
 
 	public override int GetHashCode() => Face.GetHashCode()
 		^ (int)BitOperations.RotateRight((uint)X, 8)
@@ -128,14 +128,14 @@ struct Position : IEquatable<Position> {
 	public Position Down() => this + Direction.S;
 	public Position Left() => this + Direction.W;
 
-	public Position FaceTo(Direction face) => new Position(X, Y, face);
+	public Position FaceTo(Direction face) => new(X, Y, face);
 	public Position CW() => this.FaceTo(Face.CW());
 	public Position CCW() => this.FaceTo(Face.CCW());
 	public Position Reverse() => this.FaceTo(Face.Reverse());
 	public Position Stop() => this.FaceTo(Direction.Zero);
 
-	public static Direction operator -(Position a, Position b) => new Direction(a.X - b.X, a.Y - b.Y);
-	public static Position operator +(Position p, Direction d) => new Position(p.X + d.DX, p.Y + d.DY, p.Face);
+	public static Direction operator -(Position a, Position b) => new(a.X - b.X, a.Y - b.Y);
+	public static Position operator +(Position p, Direction d) => new(p.X + d.DX, p.Y + d.DY, p.Face);
 	public static bool operator ==(Position a, Position b) => a.X == b.X && a.Y == b.Y && a.Face == b.Face;
 	public static bool operator !=(Position a, Position b) => !(a == b);
 	public override bool Equals(object? obj) => obj is Position p && this == p;
@@ -288,7 +288,7 @@ class Board : IEnumerable<Position> {
 }
 
 public class History<T> : IEnumerable<T> {
-	public static History<T> Empty { get; } = new History<T>();
+	public static History<T> Empty { get; } = new();
 	
 	public readonly T Last;
 	public readonly History<T> Prefix;
@@ -299,7 +299,7 @@ public class History<T> : IEnumerable<T> {
 	public History(T start) => (Prefix, Last) = (new History<T>(), start);
 	public History(History<T> prefix, T last) => (Prefix, Last, Length) = (prefix, last, prefix.Length + 1);
 	
-	public History<T> AndThen(T state) => new History<T>(this, state);
+	public History<T> AndThen(T state) => new(this, state);
 
 	public IEnumerator<T> GetEnumerator() {
 		if (IsEmpty) yield break;
@@ -317,20 +317,20 @@ public delegate IEnumerable<(TState, TTransition)> StateTransition<TState, TTran
 public abstract class SearchBase<TState, TAct> {
 	public Predicate<TState> Goal { get; set; }
 	public IList<TAct> Acts { get; set; }
-	public List<Func<TState, TAct, bool>> ActFilters { get; } = new List<Func<TState, TAct, bool>>();
-	public List<Predicate<TState>> StateFilters { get; } = new List<Predicate<TState>>();
+	public List<Func<TState, TAct, bool>> ActFilters { get; } = new();
+	public List<Predicate<TState>> StateFilters { get; } = new();
 	public Func<TState, TAct, TState> Transition { get; set; }
 	public IMembership<TState>? Seen { get; set; }
 	public TState Start { get; set; }
 	public DumpContainer? DumpContainer { get; set; }
 	public int StatesEvaluated { get; protected set; }
-	public Stopwatch Timer { get; } = new Stopwatch();
+	public Stopwatch Timer { get; } = new();
 
 	public SearchBase(TState start, IList<TAct> acts) {
 		this.Start = start;
 		this.Acts = acts;
 		this.Goal = _ => true;
-		this.Transition = (_, _) => throw new Exception("Transition not specified");
+		this.Transition = (_, _) => throw new("Transition not specified");
 	}
 	
 	public SearchBase<TState, TAct> AddActFilter(Func<TState, TAct, bool> legalAct) {
@@ -377,8 +377,7 @@ public abstract class SearchBase<TState, TAct> {
 }
 
 public static class DepthFirst {
-	public static DepthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
-		=> new DepthFirst<TState, TAct>(start, acts);
+	public static DepthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts) => new(start, acts);
 }
 
 public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
@@ -389,9 +388,9 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 	
 	public override History<TAct>? SearchCore(out TState finalState) => SearchCore(Start, new History<TAct>(), out finalState);
 	
-	private List<double> StatesRateHistory = new List<double>();
-	private List<int> LongestHistoryLengthHistory = new List<int>();
-	private List<double> ElapsedHistory = new List<double>();
+	private List<double> StatesRateHistory = new();
+	private List<int> LongestHistoryLengthHistory = new();
+	private List<double> ElapsedHistory = new();
 	private void DumpState(bool forceShow, TState state, History<TAct> history) {
 		if (DumpContainer is object) {
 			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
@@ -441,8 +440,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 }
 
 public static class BreadthFirst {
-	public static BreadthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts)
-		=> new BreadthFirst<TState, TAct>(start, acts);
+	public static BreadthFirst<TState, TAct> Create<TState, TAct>(TState start, IList<TAct> acts) => new(start, acts);
 }
 
 public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
@@ -450,10 +448,10 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 
 	public BreadthFirst(TState start, IList<TAct> acts) : base(start, acts) {}
 	
-	private List<double> StatesRateHistory = new List<double>();
-	private List<int> HistoryLengthHistory = new List<int>();
-	private List<int> QueueDepthHistory = new List<int>();
-	private List<double> ElapsedHistory = new List<double>();
+	private List<double> StatesRateHistory = new();
+	private List<int> HistoryLengthHistory = new();
+	private List<int> QueueDepthHistory = new();
+	private List<double> ElapsedHistory = new();
 	private void DumpState(bool forceShow, TState state, History<TAct> history, int queueDepth) {
 		if (DumpContainer is object) {
 			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
@@ -479,7 +477,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 	}
 	
 	public override History<TAct>? SearchCore(out TState finalState) {
-		var queue = new Queue<(TState, History<TAct>)>();
+		Queue<(TState, History<TAct>)> queue = new();
 		
 		for (queue.Enqueue((Start, History<TAct>.Empty)); queue.TryDequeue(out var element); ) {
 			var (state, history) = element;
@@ -508,8 +506,7 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 }
 
 public static class Dijkstra {
-	public static Dijkstra<TState, TAct> Create<TState, TAct>(TState start, Func<TState, IComparable> getCost, IList<TAct> acts)
-		=> new Dijkstra<TState, TAct>(start, getCost, acts);
+	public static Dijkstra<TState, TAct> Create<TState, TAct>(TState start, Func<TState, IComparable> getCost, IList<TAct> acts) => new(start, getCost, acts);
 }
 
 public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
@@ -520,7 +517,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 		: base(start, acts) => GetCost = getCost;
 
 	public override History<TAct>? SearchCore(out TState finalState) {
-		var agenda = new PriorityQueue<(TState State, History<TAct> History)>(t => GetCost(t.State), direction: -1, (Start, History<TAct>.Empty));
+		PriorityQueue<(TState State, History<TAct> History)> agenda = new(t => GetCost(t.State), direction: -1, (Start, History<TAct>.Empty));
 
 		while (agenda.Count > 0) {
 			var (state, history) = agenda.Pop();
@@ -546,9 +543,9 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 		return null;
 	}
 
-	private List<double> StatesRateHistory = new List<double>();
-	private List<int> AgendaSizeHistory = new List<int>();
-	private List<double> ElapsedHistory = new List<double>();
+	private List<double> StatesRateHistory = new();
+	private List<int> AgendaSizeHistory = new();
+	private List<double> ElapsedHistory = new();
 	private void DumpState(bool forceShow, TState state, int agendaSize) {
 		if (DumpContainer is object) {
 			if (forceShow || this.Timer.Elapsed - LastReport > TimeSpan.FromMilliseconds(500)) {
@@ -572,7 +569,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 }
 
 public class PriorityQueue<T> {
-	private List<(T Element, IComparable Priority)> Items = new List<(T, IComparable)>();
+	private List<(T Element, IComparable Priority)> Items = new();
 	private readonly Func<T, IComparable> GetPriority;
 	
 	public int Direction { get; }
@@ -756,7 +753,7 @@ public static class Extensions {
 		chart.ChartAreas[0].AxisX.RoundAxisValues();
 		chart.Size = new Size(width, height);
 		
-		var bitmap = new Bitmap(width, height);
+		Bitmap bitmap = new(width, height);
 		chart.DrawToBitmap(bitmap, new Rectangle(0, 0, width, height));
 		return bitmap;
 	}
@@ -819,10 +816,10 @@ public static class Extensions {
 		}
 	}
 	
-	public static Dictionary<TKey, TValue> Clone<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> @this) where TKey: notnull
-		=> new Dictionary<TKey, TValue>(@this);
+	public static Dictionary<TKey, TValue> Clone<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> @this) 
+		where TKey: notnull => new(@this);
 		
-	public static Lazy<T> ToLazy<T>(this T @this) => new Lazy<T>(@this);
+	public static Lazy<T> ToLazy<T>(this T @this) => new(@this);
 	
 	public static T? ToNullable<T>(this T @this) where T : struct => @this;
 }
