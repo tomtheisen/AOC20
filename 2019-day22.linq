@@ -13,69 +13,56 @@ void Main() {
 	var shuffles = ReadLines().Select(Shuffle.Parse).ToArray();
 
     var deck = new Deck(10007, 0, 1);
-    var allShuf = shuffles.Aggregate((a, b) => a.AndThen(b, deck.Size));
-    var part1Shuffled = deck.Shuffle(allShuf);
+    var part1Shuffled = deck.Shuffle(shuffles.Aggregate((a, b) => a.AndThen(b, deck.Size)));
     
-    long p1idx = part1Shuffled.FindCard(2019).Dump("Part 1");
-    part1Shuffled.CardAt(p1idx).Dump("2019?");
+    BigInteger p1idx = part1Shuffled.FindCard(2019).Dump("Part 1");
 
-    
     var bigdeck = new Deck(119315717514047, 0, 1);
-    Shuffle duplicated = shuffles.Aggregate((a, b) => a.AndThen(b, bigdeck.Size));
-    long targetTimes = 101741582076661;
+    Shuffle fullShuffle = shuffles.Aggregate((a, b) => a.AndThen(b, bigdeck.Size));
+    BigInteger targetTimes = 101741582076661;
     
-    for (long count = 1; count < targetTimes; targetTimes *= 2) {
-        if ((targetTimes & targetTimes) > 0) bigdeck = bigdeck.Shuffle(duplicated);
-        duplicated = duplicated.AndThen(duplicated, bigdeck.Size);
-    }
-    
-    bigdeck.Dump()
-        .CardAt(2020).Dump();
-    
-    
-    
+    bigdeck.ShuffleTimes(fullShuffle, targetTimes).CardAt(2020).Dump();
 }
 
-record Shuffle(long Stride, long Offset) {
-	public Shuffle Normalize(long size) => new Shuffle(
+record Shuffle(BigInteger Stride, BigInteger Offset) {
+	public Shuffle Normalize(BigInteger size) => new Shuffle(
 		(Stride % size + size) % size,
 		(Offset % size + size) % size
 	);
     
-    public Shuffle AndThen(Shuffle other, long size) => new Shuffle(
+    public Shuffle AndThen(Shuffle other, BigInteger size) => checked(new Shuffle(
 		this.Stride * other.Stride,
 		this.Offset * other.Stride + other.Offset
-	).Normalize(size);
+	).Normalize(size));
     
     public static Shuffle Parse(string str) => 
-    	str.StartsWith("deal with increment ") ? new Shuffle(long.Parse(str[20..]), 0) 
-    	: str.StartsWith("cut ") ? new Shuffle(1, long.Parse(str[4..]))
+    	str.StartsWith("deal with increment ") ? new Shuffle(BigInteger.Parse(str[20..]), 0) 
+    	: str.StartsWith("cut ") ? new Shuffle(1, BigInteger.Parse(str[4..]))
     	: str == "deal into new stack" ? new Shuffle(-1, 1)
     	: throw new ArgumentOutOfRangeException(nameof(str));
 }
 
-record Deck(long Size, long ZeroIndex, long Stride) {
+record Deck(BigInteger Size, BigInteger ZeroIndex, BigInteger Stride) {
 	public Deck Normalize() => this with {
 		ZeroIndex = (ZeroIndex % Size + Size) % Size,
 		Stride = (Stride % Size + Size) % Size,
 	};
 	
-	public long FindCard(long card) => (card * Stride + ZeroIndex) % Size;
+	public BigInteger FindCard(BigInteger card) => (BigInteger) checked((card * Stride + ZeroIndex) % Size);
     
-    public long CardAt(long position) {
+    public BigInteger CardAt(BigInteger position) {
         checked {
-            long up = Stride, uptimes = 1, down = Stride - Size, downtimes = 1;
+            BigInteger up = Stride, uptimes = 1, down = Stride - Size, downtimes = 1;
             
             while (up != 1) {
-                long newstep = up + down;
+                BigInteger newstep = up + down;
                 if (newstep > 0) (up, uptimes) = (newstep, uptimes + downtimes);
                 else (down, downtimes) = (newstep, uptimes + downtimes);
             }
             
-            //new { up, down, uptimes, downtimes }.Dump();
-            
-            var result = (new BigInteger(position - ZeroIndex + Size) % Size * uptimes + ZeroIndex) % Size;
-            return (long)result;
+            BigInteger distanceFromZero = (position - ZeroIndex + Size) % Size;
+            var result = distanceFromZero * uptimes % Size;
+            return (BigInteger)result;
         }
     }
     
@@ -83,4 +70,14 @@ record Deck(long Size, long ZeroIndex, long Stride) {
 		this.ZeroIndex * shuffle.Stride - shuffle.Offset, 
 		this.Stride * shuffle.Stride
 	).Normalize();
+    
+    public Deck ShuffleTimes(Shuffle shuffle, BigInteger times) {
+        var deck = this;
+        Shuffle duplicated = shuffle;
+        for (BigInteger count = 1; count <= times; count *= 2) {
+            if ((count & times) > 0) deck = deck.Shuffle(duplicated);
+            duplicated = duplicated.AndThen(duplicated, deck.Size);
+        }
+        return deck;
+    }
 }
