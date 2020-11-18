@@ -18,7 +18,8 @@ public class IntCodeMachine : IObservable<long> {
 	public BlockingCollection<long> Input { get; } = new BlockingCollection<long>();
 	public Action<long>? Output { get; set; }
 	public Func<long>? InputOverride { get; set; }
-	
+	public Func<long>? InputFallback { get; set; }
+    
 	private int IP = 0;
 	private int RelativeBase = 0;
 	private bool Running = false;
@@ -136,7 +137,12 @@ public class IntCodeMachine : IObservable<long> {
 	public void TakeInput(params long[] input) => input.ToList().ForEach(TakeInput);
 	public void TakeInput(string input) => TakeInput(input.Select(i => (long)i).ToArray());
 	
-	private long GetInput() => InputOverride?.Invoke() ?? Input.Take();
+	private long GetInput() {
+        if (InputOverride is not null) return InputOverride();
+        if (InputFallback is null) return Input.Take();
+        if (Input.TryTake(out long result)) return result;
+        return InputFallback();
+    }
 	
 	private void DoOutput(long n) {
 		(Output ?? WriteLine)(n);
