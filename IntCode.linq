@@ -20,9 +20,9 @@ public class IntCodeMachine : IObservable<long> {
 	public Func<long>? InputOverride { get; set; }
 	public Func<long>? InputFallback { get; set; }
     public int StepsExecuted { get; private set; }
-    
-	private int IP = 0;
-	private int RelativeBase = 0;
+    public int IP { get; private set; }
+
+    private int RelativeBase = 0;
 	private bool Running = false;
 	private readonly List<IObserver<long>> Observers = new List<IObserver<long>>();
 	
