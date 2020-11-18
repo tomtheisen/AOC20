@@ -9,7 +9,7 @@
 #load ".\AOC2020"
 
 string b = "";
-var machine = new IntCodeMachine { Output = n => b += (char)n };
+IntCodeMachine machine = new(){ OutputAction = n => b += (char)n };
 
 machine.Run();
 
@@ -65,7 +65,7 @@ C R,12,L,12,R,6
 
 machine.Reset();
 machine.Memory[0] = 2;
-machine.Output = e => {
+machine.OutputAction = e => {
 	if (e < 127) Console.Write((char)e);
 	else e.Dump("Part 2");
 };

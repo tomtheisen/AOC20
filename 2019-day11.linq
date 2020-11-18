@@ -9,16 +9,16 @@
 #load ".\AOC2020"
 
 for (int i = 0; i < 2; i++) {
-	var machine = new IntCodeMachine();
+	IntCodeMachine machine = new();
 	HashSet<Position> white = new HashSet<Position>(), painted = new HashSet<Position>();
 	if (i == 1) white.Add(Position.Origin);
 	var pos = new Position(0, 0, Direction.N);
 	
 	var outputs = new BlockingCollection<long>();
-	machine.Output = outputs.Add;
+	machine.OutputAction = outputs.Add;
 	
 	var cancelSource = new CancellationTokenSource();
-	var run = Task.Run(machine.Run).ContinueWith(t => cancelSource.Cancel());
+	var run = Task.Run(() => machine.Run()).ContinueWith(t => cancelSource.Cancel());
 	try {	        
 		while (!run.IsCompleted) {
 			machine.TakeInput(white.Contains(pos.Stop()) ? 1 : 0);

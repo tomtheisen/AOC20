@@ -10,45 +10,49 @@
 #load ".\AOC2020"
 
 List<IntCodeMachine> machines = new();
-
 for (int i = 0; i < 50; i++) {
-    var container = new DumpContainer().Dump("Machine " + i);
-    IntCodeMachine machine = new() { Output = _ => {} };
-    int inputFallbacks = 0;
-    machine.InputFallback = () => {
-        container.Content = new { machine.StepsExecuted, InputFallbacks = ++inputFallbacks };
-        if (machine.Input.TryTake(out long item, 100)) return item;
-        return -1;
+    IntCodeMachine machine = new() { 
+        //OutputAction = _ => {} 
     };
     machine.TakeInput(i);
     machines.Add(machine);
 }
 
-List<Task> tasks = new();
+Queue<IntCodeMachine> work = new(machines);
 
-int mi = 0;
-CancellationTokenSource cts = new();
-var token = cts.Token;
-
-machines.ForEach(machine => {
-    int thisAddress = mi++;
+while (true) {
+    var machine = work.Dequeue();
     
-    void OperateMachine() {
-        while (!token.IsCancellationRequested) {
-            long targetAddress = machine.RunToNextOutputOrThrow(token);
-            long x = machine.RunToNextOutputOrThrow(token);
-            long y = machine.RunToNextOutputOrThrow(token);
-            
-            if (0 <= targetAddress && targetAddress < 50) machines[(int)targetAddress].TakeInput(x, y);
-            else if (targetAddress == 255) {
-                y.Dump("Part 1");
-                return;
-            }
+    machine.RunToNextBlockedInput();
+    
+    while (machine.Output.Count > 0) {
+        long targetAddress = machine.Output.Dequeue();
+        long x = machine.Output.Dequeue();
+        long y = machine.Output.Dequeue();
+
+        if (0 <= targetAddress && targetAddress < 50) {
+            // new {targetAddress, x, y}.Dump();
+        
+            var target = machines[(int)targetAddress];
+            target.TakeInput(x, y);
+            work.Enqueue(target);
+        }
+        else if (targetAddress == 255) {
+            y.Dump("Part 1");
+            return;
         }
     }
     
-    tasks.Add(Task.Run(OperateMachine, token));
-});
-    
-Task.WaitAny(tasks.ToArray());
-cts.Cancel();
+    if (work.Count == 0) {
+        foreach (var m in machines) {
+            m.TakeInput(-1);
+            work.Enqueue(m);
+        }
+    }
+}
+
+machines.Select((m, i) => new { 
+    IP = (int)m.Uncapsulate().IP, 
+    Upcoming = m.Memory.Skip((int)m.Uncapsulate().IP).Take(10) 
+})
+.Dump();

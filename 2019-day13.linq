@@ -11,7 +11,7 @@
 var machine = new IntCodeMachine();
 {
 	var output = new List<long>();
-	machine.Output = output.Add;
+	machine.OutputAction = output.Add;
 	machine.Run();
 	
 	output.BatchBy(3)
@@ -21,7 +21,7 @@ var machine = new IntCodeMachine();
 		.Dump();
 }
 
-machine.Output = nm => {};
+machine.OutputAction = nm => {};
 machine.Reset();
 machine.Memory[0] = 2;
 

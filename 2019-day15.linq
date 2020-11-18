@@ -8,9 +8,9 @@
 #load ".\IntCode"
 #load ".\AOC2020"
 
-var board = new Board();
-var machine = new IntCodeMachine() { Output = _ => {} };
-var seenPos = new HashSet<Position> { Position.Origin };
+Board board = new();
+IntCodeMachine machine = new();
+HashSet<Position> seenPos = new(){ Position.Origin };
 
 var boardContainer = new DumpContainer(board).Dump("Board");
 
@@ -30,10 +30,9 @@ BreadthFirst
 		
 		var status = machine.RunToNextOutputOrThrow();
 		if (status == 2) (steps + 1).Dump("Found Module");
-		//boardContainer.Content = 
+		boardContainer.Content = 
 		board = board.With(pos.Move(dir), "#.S"[(int)status]);
 		//Thread.Sleep(1);
-		
 		return (machine, status > 0 ? pos.Move(dir) : pos, status, steps + 1);
 	})
 	.AddStateFilter(state => seenPos.Add(state.position))
@@ -42,7 +41,7 @@ BreadthFirst
 
 BreadthFirst.Create(board.Find("S") , Direction.Cardinal)
 	.SetTransition ((position, direction) => {
-		//boardContainer.Content = 
+		boardContainer.Content = 
 		board = board.With(position, 'O');
 		//Thread.Sleep(1);
 		return position.Move(direction);

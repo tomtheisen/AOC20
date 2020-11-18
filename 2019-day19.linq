@@ -9,7 +9,7 @@
 #load ".\IntCode"
 #load ".\AOC2020"
 
-var machine = new IntCodeMachine{ Output = _ => {} };
+var machine = new IntCodeMachine();
 
 long total = 0, output;
 var board = new Board(50, 50);

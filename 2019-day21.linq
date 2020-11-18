@@ -9,8 +9,8 @@
 #load ".\IntCode"
 #load ".\AOC2020"
 
-var machine = new IntCodeMachine { 
-    Output = n => Console.Write(n < 127 ? "" + (char)n : n + "\n")
+IntCodeMachine machine = new() { 
+    OutputAction = n => Console.Write(n < 127 ? "" + (char)n : n + "\n")
 };
 
 // part 1

@@ -15,8 +15,9 @@ public class IntCodeMachine : IObservable<long> {
 	private long[] InitialMemory;
 	public long[] Memory { get; set; }
 	
-	public BlockingCollection<long> Input { get; } = new BlockingCollection<long>();
-	public Action<long>? Output { get; set; }
+	public BlockingCollection<long> Input { get; } = new();
+    public Queue<long> Output { get; } = new();
+	public Action<long>? OutputAction { get; set; }
 	public Func<long>? InputOverride { get; set; }
 	public Func<long>? InputFallback { get; set; }
     public int StepsExecuted { get; private set; }
@@ -24,7 +25,7 @@ public class IntCodeMachine : IObservable<long> {
 	private int IP = 0;
 	private int RelativeBase = 0;
 	private bool Running = false;
-	private readonly List<IObserver<long>> Observers = new List<IObserver<long>>();
+	private readonly List<IObserver<long>> Observers = new();
 	
 	public IntCodeMachine() 
 		: this(ReadString().Split(',').Select(long.Parse).ToArray()) {}
@@ -38,7 +39,7 @@ public class IntCodeMachine : IObservable<long> {
 	public IntCodeMachine Clone() {
 		var result = new IntCodeMachine(InitialMemory) {
 			Memory = Memory[..],
-			Output = Output,
+			OutputAction = OutputAction,
 			InputOverride = InputOverride,
 			IP = IP,
 			RelativeBase = RelativeBase,
@@ -70,7 +71,7 @@ public class IntCodeMachine : IObservable<long> {
 		return ref result;
 	}
 	
-	public long? Step() {
+	public long? Step(bool allowBlockOnInput = true) {
         StepsExecuted += 1;
 		switch (Memory[IP] % 100) {
 			case 1:
@@ -81,7 +82,8 @@ public class IntCodeMachine : IObservable<long> {
 				Operand(3) = Operand(1) * Operand(2);
 				IP += 4;
 				break;
-			case 3: 
+			case 3:
+                if (Input.Count == 0 && !allowBlockOnInput) break;
 				Operand(1) = GetInput();
 				IP += 2;
 				break;
@@ -126,6 +128,17 @@ public class IntCodeMachine : IObservable<long> {
 	}
 	
 	public long RunToNextOutputOrThrow(CancellationToken? token = null) => RunToNextOutput(token) ?? throw new Exception("machine terminated unexpectedly");
+    
+    public void RunToNextBlockedInput(CancellationToken? token = null) {
+		Running = true;
+		do {
+            //Console.WriteLine("Starting: " + IP);
+            int ip = IP;
+            Step(allowBlockOnInput: false);
+            //new {ip, IP}.Dump();
+            if (ip == IP) return;
+        } while (Running && token?.IsCancellationRequested != true);
+    }
 	
 	public void Run(CancellationToken? token = null) {
 		IP = 0;
@@ -146,7 +159,7 @@ public class IntCodeMachine : IObservable<long> {
     }
 	
 	private void DoOutput(long n) {
-		(Output ?? WriteLine)(n);
+		(OutputAction ?? Output.Enqueue)(n);
 		Observers.ForEach(o => o.OnNext(n));
 	}
 

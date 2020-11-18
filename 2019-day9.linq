@@ -7,7 +7,7 @@
 #load ".\IntCode"
 #load ".\AOC2020"
 
-var m = new IntCodeMachine();
+IntCodeMachine m = new() { OutputAction = WriteLine };
 m.TakeInput(1);
 m.Run();
 

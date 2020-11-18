@@ -8,9 +8,8 @@
 #load ".\AOC2020"
 
 {
-	var machine = new IntCodeMachine();
 	long power, result = int.MinValue;
-	machine.Output = o => power = o;
+	IntCodeMachine machine = new() { OutputAction = o => power = o};
 	
 	foreach (var perm in Permutations(0,1,2,3,4)) {
 		power = 0;
@@ -28,9 +27,9 @@
 	var machines = new IntCodeMachine[5];
 	for (int i = 0; i < 5; i++) {
 		machines[i] = new IntCodeMachine();
-		if (i > 0) machines[i - 1].Output = machines[i].TakeInput;
+		if (i > 0) machines[i - 1].OutputAction = machines[i].TakeInput;
 	}
-	machines[^1].Output = machines[0].TakeInput;
+	machines[^1].OutputAction = machines[0].TakeInput;
 	
 	long result = int.MinValue;
 	foreach (var perm in Permutations(5,6,7,8,9)) {
@@ -39,7 +38,7 @@
 			machines[i].TakeInput(perm[i]);
 		}
 		machines[0].TakeInput(0);
-		var tasks = machines.Select(m => Task.Factory.StartNew(m.Run)).ToArray();
+		var tasks = machines.Select(m => Task.Factory.StartNew(() => m.Run())).ToArray();
 		Task.WaitAll(tasks);
 		result = Max(result, machines[0].Input.TryTake(out long t) ? t : throw new Exception());
 	}
