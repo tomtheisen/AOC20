@@ -11,35 +11,33 @@
 
 List<IntCodeMachine> machines = new();
 for (int i = 0; i < 50; i++) {
-    IntCodeMachine machine = new() { 
-        //OutputAction = _ => {} 
-    };
+    IntCodeMachine machine = new();
     machine.TakeInput(i);
     machines.Add(machine);
 }
 
 Queue<IntCodeMachine> work = new(machines);
+HashSet<long> seennaty = new();
+long natx = long.MinValue, naty = long.MinValue;
 
-while (true) {
+for (bool done = false; !done; ) {
     var machine = work.Dequeue();
     
     machine.RunToNextBlockedInput();
     
-    while (machine.Output.Count > 0) {
+    while (machine.Output.Count >= 3) {
         long targetAddress = machine.Output.Dequeue();
         long x = machine.Output.Dequeue();
         long y = machine.Output.Dequeue();
 
         if (0 <= targetAddress && targetAddress < 50) {
-            // new {targetAddress, x, y}.Dump();
-        
             var target = machines[(int)targetAddress];
             target.TakeInput(x, y);
             work.Enqueue(target);
         }
         else if (targetAddress == 255) {
-            y.Dump("Part 1");
-            return;
+            if (naty == long.MinValue) y.Dump("Part 1");
+            (natx, naty) = (x, y);
         }
     }
     
@@ -48,11 +46,10 @@ while (true) {
             m.TakeInput(-1);
             work.Enqueue(m);
         }
+        if (!seennaty.Add(naty)) {
+            naty.Dump("Part 2");
+            return;
+        }
+        machines[0].TakeInput(natx, naty);
     }
 }
-
-machines.Select((m, i) => new { 
-    IP = (int)m.Uncapsulate().IP, 
-    Upcoming = m.Memory.Skip((int)m.Uncapsulate().IP).Take(10) 
-})
-.Dump();
