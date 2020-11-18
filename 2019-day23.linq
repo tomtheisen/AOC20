@@ -9,36 +9,35 @@
 #load ".\IntCode"
 #load ".\AOC2020"
 
-long GetMinusOneSlowly() {
-    Thread.Sleep(10);
-    return -1;
-}
-
 List<IntCodeMachine> machines = new();
 
 for (int i = 0; i < 50; i++) {
-    IntCodeMachine machine = new() { InputFallback = GetMinusOneSlowly, Output = _ => {} };
+    var container = new DumpContainer().Dump("Machine " + i);
+    IntCodeMachine machine = new() { Output = _ => {} };
+    int inputFallbacks = 0;
+    machine.InputFallback = () => {
+        container.Content = new { machine.StepsExecuted, InputFallbacks = ++inputFallbacks };
+        if (machine.Input.TryTake(out long item, 100)) return item;
+        return -1;
+    };
     machine.TakeInput(i);
     machines.Add(machine);
 }
 
 List<Task> tasks = new();
 
-var sw = Stopwatch.StartNew();
 int mi = 0;
-
 CancellationTokenSource cts = new();
 var token = cts.Token;
 
 machines.ForEach(machine => {
     int thisAddress = mi++;
-    tasks.Add(Task.Run(() => {
+    
+    void OperateMachine() {
         while (!token.IsCancellationRequested) {
-            long targetAddress = machine.RunToNextOutputOrThrow();
-            long x = machine.RunToNextOutputOrThrow();
-            long y = machine.RunToNextOutputOrThrow();
-            
-            Console.WriteLine($"{sw.Elapsed} {thisAddress:00}: To {targetAddress:00} {x,15}, {y,15}");
+            long targetAddress = machine.RunToNextOutputOrThrow(token);
+            long x = machine.RunToNextOutputOrThrow(token);
+            long y = machine.RunToNextOutputOrThrow(token);
             
             if (0 <= targetAddress && targetAddress < 50) machines[(int)targetAddress].TakeInput(x, y);
             else if (targetAddress == 255) {
@@ -46,7 +45,9 @@ machines.ForEach(machine => {
                 return;
             }
         }
-    }, token));
+    }
+    
+    tasks.Add(Task.Run(OperateMachine, token));
 });
     
 Task.WaitAny(tasks.ToArray());

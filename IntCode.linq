@@ -19,6 +19,7 @@ public class IntCodeMachine : IObservable<long> {
 	public Action<long>? Output { get; set; }
 	public Func<long>? InputOverride { get; set; }
 	public Func<long>? InputFallback { get; set; }
+    public int StepsExecuted { get; private set; }
     
 	private int IP = 0;
 	private int RelativeBase = 0;
@@ -49,7 +50,7 @@ public class IntCodeMachine : IObservable<long> {
 	
 	public void Reset() {
 		Memory = InitialMemory[..];
-		RelativeBase = IP = 0;
+		StepsExecuted = RelativeBase = IP = 0;
 		Running = false;
 		while (Input.TryTake(out _));
 	}
@@ -70,6 +71,7 @@ public class IntCodeMachine : IObservable<long> {
 	}
 	
 	public long? Step() {
+        StepsExecuted += 1;
 		switch (Memory[IP] % 100) {
 			case 1:
 				Operand(3) = Operand(1) + Operand(2);
@@ -115,21 +117,20 @@ public class IntCodeMachine : IObservable<long> {
 		return null;
 	}
 	
-	public long? RunToNextOutput() {
+	public long? RunToNextOutput(CancellationToken? token = null) {
 		Running = true;
 		long? output;
 		do output = Step();
-		while (Running && output == null);
+		while (Running && output == null && token?.IsCancellationRequested != true);
 		return output;
 	}
 	
-	public long RunToNextOutputOrThrow() => RunToNextOutput() ?? throw new Exception("machine terminated unexpectedly");
+	public long RunToNextOutputOrThrow(CancellationToken? token = null) => RunToNextOutput(token) ?? throw new Exception("machine terminated unexpectedly");
 	
-	public void Run() {
+	public void Run(CancellationToken? token = null) {
 		IP = 0;
 		Running = true;
-		while (Running) Step();
-		
+		while (Running && token?.IsCancellationRequested != true) Step();
 		Observers.ForEach(o => o.OnCompleted());
 	}
 	
