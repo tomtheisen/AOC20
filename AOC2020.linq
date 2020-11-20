@@ -196,7 +196,7 @@ class Board : IEnumerable<Position> {
 		(ChangedPosition, NewChar) = (changedPosition, newChar);
 	}
 	
-	public Board(string cells) : this(Regex.Split(cells, @"\r?\n")) { }
+	public Board(string cells) : this(Regex.Split(cells.TrimEnd('\r', '\n'), @"\r?\n")) { }
 	
 	public Board(IEnumerable<string> lines) {
 		var linesList = lines.ToList();
@@ -822,4 +822,7 @@ public static class Extensions {
 	public static Lazy<T> ToLazy<T>(this T @this) => new(@this);
 	
 	public static T? ToNullable<T>(this T @this) where T : struct => @this;
+	
+	public static string PadCenter(this string @this, int width) 
+		=> @this.PadLeft(width + @this.Length >> 1).PadRight(width);
 }
