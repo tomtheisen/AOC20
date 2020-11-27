@@ -3,6 +3,7 @@
   <Namespace>System.Diagnostics.CodeAnalysis</Namespace>
   <Namespace>System.Numerics</Namespace>
   <Namespace>System.Drawing</Namespace>
+  <Namespace>System.Runtime.InteropServices</Namespace>
 </Query>
 
 #nullable enable
@@ -70,6 +71,10 @@ void Main() {
 		.SetDumpContainer()
 		.Search()
 		.Dump("how to make 7");
+        
+    (1.0).Successor().Dump("1 successor");
+    (-1.0).Successor().Dump("-1 successor");
+    double.MinValue.Predecessor().Dump("min predecessor").Predecessor().Dump("again");
 }
 
 struct Direction : IEquatable<Direction> {
@@ -825,4 +830,24 @@ public static class Extensions {
 	
 	public static string PadCenter(this string @this, int width) 
 		=> @this.PadLeft(width + @this.Length >> 1).PadRight(width);
+    
+    [StructLayout(LayoutKind.Explicit)]
+    private struct LongDoubleUnion {
+        [FieldOffset(0)] public double Double;
+        [FieldOffset(0)] public ulong Integer;
+    }
+    
+    public static double Successor(this double @this) {
+        if (@this < 0) return -(-@this).Predecessor();
+        var s = new LongDoubleUnion { Double = @this };
+        ++s.Integer;
+        return s.Double;
+    }
+    
+    public static double Predecessor(this double @this) {
+        if (@this < 0) return -(-@this).Successor();
+        var s = new LongDoubleUnion { Double = @this };
+        --s.Integer;
+        return s.Double;
+    }
 }
