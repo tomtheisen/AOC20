@@ -74,6 +74,7 @@ void Main() {
         
     (1.0).Successor().Dump("1 successor");
     (-1.0).Successor().Dump("-1 successor");
+    (0.0).Successor().Dump("0 successor");
     double.MinValue.Predecessor().Dump("min predecessor").Predecessor().Dump("again");
 }
 
@@ -774,6 +775,8 @@ public static class Extensions {
 		}
 		if (current.Count > 0) yield return current;
 	}
+
+	public static IEnumerable<T> TakeEvery<T>(this IEnumerable<T> @this, int size) => @this.BatchBy(size).Select(Enumerable.First);
 	
 	public static T MinBy<T>(this IEnumerable<T> @this, Func<T, IComparable> keyFunc) {
 		bool first = true;
