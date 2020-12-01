@@ -25,32 +25,32 @@ void Main() {
 		.Dump("Goal Keys Mask");
 
 	// Priority search over key-seeking
-    //
+	//
 	var doorPos = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
 	var keyPos = "abcdefghijklmnopqrstuvwxyz".Where(e => board.FindAll(e).Any()).ToDictionary(e => e, e => board.Find(e));
 
-    // Priority lookups over key-seeking
-    var paths = new Dictionary<(char, char), (int Distance, int KeysNeeded)>();
-    for (char startKey = '@'; startKey <= 'z'; startKey++, startKey |= ' ') {
-        var startPos = board.Find(startKey);
-        BreadthFirst.Create((pos: startPos, moves: 0, keysNeeded: 0), Direction.Cardinal)
-            .DetectLoops(state => state.pos)
-            .SetGoal(_ => false)
-            .AddStateFilter(state => board[state.pos] != '#')
-            .SetTransition((state, act) => {
-                int newKeysNeeded = state.keysNeeded;
-                char tile = board[state.pos];
-                if (IsDoor(tile)) newKeysNeeded |= 1 << tile - 'A';
-                else if (IsKey(tile) && tile != startKey) paths[(startKey, tile)] = (state.moves, state.keysNeeded);
-                
-                // moving past a key is inefficient unless you already have that key
-                if (IsKey(tile) && tile != startKey) newKeysNeeded |= 1 << tile - 'a'; 
-                
-                return (state.pos.Move(act), state.moves + 1, newKeysNeeded);
-            })
+	// Priority lookups over key-seeking
+	var paths = new Dictionary<(char, char), (int Distance, int KeysNeeded)>();
+	for (char startKey = '@'; startKey <= 'z'; startKey++, startKey |= ' ') {
+		var startPos = board.Find(startKey);
+		BreadthFirst.Create((pos: startPos, moves: 0, keysNeeded: 0), Direction.Cardinal)
+			.DetectLoops(state => state.pos)
+			.SetGoal(_ => false)
+			.AddStateFilter(state => board[state.pos] != '#')
+			.SetTransition((state, act) => {
+				int newKeysNeeded = state.keysNeeded;
+				char tile = board[state.pos];
+				if (IsDoor(tile)) newKeysNeeded |= 1 << tile - 'A';
+				else if (IsKey(tile) && tile != startKey) paths[(startKey, tile)] = (state.moves, state.keysNeeded);
+				
+				// moving past a key is inefficient unless you already have that key
+				if (IsKey(tile) && tile != startKey) newKeysNeeded |= 1 << tile - 'a'; 
+				
+				return (state.pos.Move(act), state.moves + 1, newKeysNeeded);
+			})
 			.AddStateFilter(state => state.moves >= 0)
-            .Search();
-    }
+			.Search();
+	}
 
 	Dijkstra.Create((pos, keys: 0, moves: 0), state => state.moves, "abcdefghijklmnopqrstuvwxyz".ToCharArray())
 		.SetDumpContainer(new DumpContainer().Dump("Pre-moved Dijkstra search"))
@@ -58,13 +58,13 @@ void Main() {
 		.AddActFilter ((state, act) => ((state.keys >> act - 'a') & 1) == 0)
 		.SetTransition ((state, act) => {
 			if (!paths.TryGetValue((board[state.pos], act), out var path)) return (default, -1, -1);
-            if ((path.KeysNeeded & state.keys) != path.KeysNeeded) return (default, -1 , -1);
+			if ((path.KeysNeeded & state.keys) != path.KeysNeeded) return (default, -1 , -1);
 			return (keyPos[act], state.keys | (1 << act - 'a'), state.moves + path.Distance);
 		})
 		.AddStateFilter(state => state.moves >= 0)
 		.DetectLoops(state => new { state.pos, state.keys })
 		.Search(out var p1state);
-    p1state.moves.Dump("Dijkstra pre-moves Part 1");
+	p1state.moves.Dump("Dijkstra pre-moves Part 1");
 	
 	var start = new Quad { 
 		Position1 = pos,
@@ -83,7 +83,7 @@ void Main() {
 			
 			if (!paths.TryGetValue((board[originalPos], act), out var path)) return new Quad { Moves = int.MinValue };
 			var (distance, keysNeeded) = path;
-            if ((path.KeysNeeded & state.Keys) != path.KeysNeeded) return new Quad { Moves = int.MinValue };
+			if ((path.KeysNeeded & state.Keys) != path.KeysNeeded) return new Quad { Moves = int.MinValue };
 			
 			state.Keys |= 1 << act - 'a';
 			state.SetPosition(quadrant, newPos);

@@ -261,8 +261,8 @@ class Board : IEnumerable<Position> {
 	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
 
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
-    
-    public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
+	
+	public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
 
 	public IEnumerator<Position> GetEnumerator() {
 		for (int y = Top; y < Bottom; y++)
@@ -284,7 +284,7 @@ class Board : IEnumerable<Position> {
 		return sb.ToString();
 	}
 
-    public override string ToString() => $"Board ({Width} x {Height})";
+	public override string ToString() => $"Board ({Width} x {Height})";
 }
 
 public class History<T> : IEnumerable<T> {
@@ -413,18 +413,18 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 	
 	public History<TAct>? SearchCore(TState state, History<TAct> history, out TState finalState) {
 		if (Seen?.Add(state) == false) {
-            finalState = default;
-            return null;
-        }
+			finalState = default;
+			return null;
+		}
 
 		bool goal = Goal(state);
 		StatesEvaluated++;
 		LongestHistory = Max(LongestHistory, history.Length);
 		DumpState(goal, state, history);
 		if (goal) {
-            finalState = state;
-            return history;
-        }
+			finalState = state;
+			return history;
+		}
 		
 		foreach (var act in Acts) {
 			if (ActFilters.Any(af => !af(state, act))) continue;
@@ -434,7 +434,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			var newHistory = history.AndThen(act);
 			if (SearchCore(newState, newHistory, out finalState) is History<TAct> result) return result;
 		}
-        finalState = default;
+		finalState = default;
 		return null;
 	}
 }
@@ -487,9 +487,9 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			this.StatesEvaluated++;
 			DumpState(goal, state, history, queue.Count);
 			if (goal) {
-                finalState = state;
-                return history;
-            }
+				finalState = state;
+				return history;
+			}
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -527,9 +527,9 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 			this.StatesEvaluated++;
 			DumpState(goal, state, agenda.Count);
 			if (goal) {
-                finalState = state;
-                return history;
-            }
+				finalState = state;
+				return history;
+			}
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -539,7 +539,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 				agenda.Add((newState, history.AndThen(act)));
 			}
 		}
-        finalState = default;
+		finalState = default;
 		return null;
 	}
 

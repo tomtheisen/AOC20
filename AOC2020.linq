@@ -72,11 +72,11 @@ void Main() {
 		.SetDumpContainer()
 		.Search()
 		.Dump("how to make 7");
-        
-    (1.0).Successor().Dump("1 successor");
-    (-1.0).Successor().Dump("-1 successor");
-    (0.0).Successor().Dump("0 successor");
-    double.MinValue.Predecessor().Dump("min predecessor").Predecessor().Dump("again");
+		
+	(1.0).Successor().Dump("1 successor");
+	(-1.0).Successor().Dump("-1 successor");
+	(0.0).Successor().Dump("0 successor");
+	double.MinValue.Predecessor().Dump("min predecessor").Predecessor().Dump("again");
 }
 
 struct Direction : IEquatable<Direction> {
@@ -268,8 +268,8 @@ class Board : IEnumerable<Position> {
 	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
 
 	public Board With(Position p, char c) => With(p.X, p.Y, c);
-    
-    public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
+	
+	public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
 
 	public IEnumerator<Position> GetEnumerator() {
 		for (int y = Top; y < Bottom; y++)
@@ -291,7 +291,7 @@ class Board : IEnumerable<Position> {
 		return sb.ToString();
 	}
 
-    public override string ToString() => $"Board ({Width} x {Height})";
+	public override string ToString() => $"Board ({Width} x {Height})";
 }
 
 public class History<T> : IEnumerable<T> {
@@ -420,18 +420,18 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 	
 	public History<TAct>? SearchCore(TState state, History<TAct> history, out TState finalState) {
 		if (Seen?.Add(state) == false) {
-            finalState = default;
-            return null;
-        }
+			finalState = default;
+			return null;
+		}
 
 		bool goal = Goal(state);
 		StatesEvaluated++;
 		LongestHistory = Max(LongestHistory, history.Length);
 		DumpState(goal, state, history);
 		if (goal) {
-            finalState = state;
-            return history;
-        }
+			finalState = state;
+			return history;
+		}
 		
 		foreach (var act in Acts) {
 			if (ActFilters.Any(af => !af(state, act))) continue;
@@ -441,7 +441,7 @@ public class DepthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			var newHistory = history.AndThen(act);
 			if (SearchCore(newState, newHistory, out finalState) is History<TAct> result) return result;
 		}
-        finalState = default;
+		finalState = default;
 		return null;
 	}
 }
@@ -494,9 +494,9 @@ public class BreadthFirst<TState, TAct>: SearchBase<TState, TAct> {
 			this.StatesEvaluated++;
 			DumpState(goal, state, history, queue.Count);
 			if (goal) {
-                finalState = state;
-                return history;
-            }
+				finalState = state;
+				return history;
+			}
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -534,9 +534,9 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 			this.StatesEvaluated++;
 			DumpState(goal, state, agenda.Count);
 			if (goal) {
-                finalState = state;
-                return history;
-            }
+				finalState = state;
+				return history;
+			}
 			
 			foreach (var act in Acts) {
 				if (ActFilters.Any(af => !af(state, act))) continue;
@@ -546,7 +546,7 @@ public class Dijkstra<TState, TAct> : SearchBase<TState, TAct> {
 				agenda.Add((newState, history.AndThen(act)));
 			}
 		}
-        finalState = default;
+		finalState = default;
 		return null;
 	}
 
@@ -834,26 +834,26 @@ public static class Extensions {
 	
 	public static string PadCenter(this string @this, int width) 
 		=> @this.PadLeft(width + @this.Length >> 1).PadRight(width);
-    
-    [StructLayout(LayoutKind.Explicit)]
-    private struct LongDoubleUnion {
-        [FieldOffset(0)] public double Double;
-        [FieldOffset(0)] public ulong Integer;
-    }
-    
-    public static double Successor(this double @this) {
-        if (@this < 0) return -(-@this).Predecessor();
-        var s = new LongDoubleUnion { Double = @this };
-        ++s.Integer;
-        return s.Double;
-    }
-    
-    public static double Predecessor(this double @this) {
-        if (@this < 0) return -(-@this).Successor();
-        var s = new LongDoubleUnion { Double = @this };
-        --s.Integer;
-        return s.Double;
-    }
+	
+	[StructLayout(LayoutKind.Explicit)]
+	private struct LongDoubleUnion {
+		[FieldOffset(0)] public double Double;
+		[FieldOffset(0)] public ulong Integer;
+	}
+	
+	public static double Successor(this double @this) {
+		if (@this < 0) return -(-@this).Predecessor();
+		var s = new LongDoubleUnion { Double = @this };
+		++s.Integer;
+		return s.Double;
+	}
+	
+	public static double Predecessor(this double @this) {
+		if (@this < 0) return -(-@this).Successor();
+		var s = new LongDoubleUnion { Double = @this };
+		--s.Integer;
+		return s.Double;
+	}
 	
 	public static T DumpClip<T>(this T @this, string? label = null) {
 		var btn = new LINQPad.Controls.Button("Copy 📋");

@@ -19,7 +19,7 @@ for (int i = 0; i < 2; i++) {
 	
 	var cancelSource = new CancellationTokenSource();
 	var run = Task.Run(() => machine.Run()).ContinueWith(t => cancelSource.Cancel());
-	try {	        
+	try {
 		while (!run.IsCompleted) {
 			machine.TakeInput(white.Contains(pos.Stop()) ? 1 : 0);
 			

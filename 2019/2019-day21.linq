@@ -10,7 +10,7 @@
 #load ".\AOC2020"
 
 IntCodeMachine machine = new() { 
-    OutputAction = n => Console.Write(n < 127 ? "" + (char)n : n + "\n")
+	OutputAction = n => Console.Write(n < 127 ? "" + (char)n : n + "\n")
 };
 
 // part 1
@@ -62,14 +62,14 @@ machine.Run();
 		   	##..	stay
 		   	##.#
 		   		##.#.
-		   		     	##.#..	jump
-		   		     	##.#.#	
-		   		     	      	##.#.#.
-		   		     	      	       	##.#.#.. stay
-		   		     	      	       	##.#.#.#
-		   		     	      	       		##.#.#.#.	??? 
-		   		     	      	       		##.#.#.##	jump
-		   		     	      	##.#.##	stay
+		   			 	##.#..	jump
+		   			 	##.#.#	
+		   			 		  	##.#.#.
+		   			 		  		   	##.#.#.. stay
+		   			 		  		   	##.#.#.#
+		   			 		  		   		##.#.#.#.	??? 
+		   			 		  		   		##.#.#.##	jump
+		   			 		  	##.#.##	stay
 		   		##.##	jump
 		###	stay
 
