@@ -4,6 +4,7 @@
   <Namespace>System.Numerics</Namespace>
   <Namespace>System.Drawing</Namespace>
   <Namespace>System.Runtime.InteropServices</Namespace>
+  <Namespace>LINQPad.Controls</Namespace>
 </Query>
 
 #nullable enable
@@ -853,4 +854,15 @@ public static class Extensions {
         --s.Integer;
         return s.Double;
     }
+	
+	public static T DumpClip<T>(this T @this, string? label = null) {
+		var btn = new LINQPad.Controls.Button("Copy 📋");
+		btn.Click += delegate { System.Windows.Clipboard.SetText(@this?.ToString()); };
+		var container = new LINQPad.Controls.Span(
+			new LINQPad.Controls.Span(@this?.ToString()), 
+			btn);
+		container.CssChildRules["*", "margin-right"] = "1em";
+		container.Dump(label);
+		return @this;
+	}
 }
