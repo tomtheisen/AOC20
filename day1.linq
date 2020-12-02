@@ -6,6 +6,8 @@
 
 #load ".\AOC2020"
 
+// L{em2m`_}L`pq[^S{|+2020=}jc": Π(`|u) = `:*"
+
 var input = ReadLongs();
 
 (
