@@ -7,13 +7,11 @@
 
 var input = ReadString();
 
-var groups = input.Replace("\r","").Split("\n\n");
-
 int total1 = 0, total2 = 0;
 
-foreach (var g in groups) {
-    total1 += string.Concat(g.Split()).Distinct().Count();
-    total2 += g.Split().Aggregate ((x, y) => string.Concat(x.Intersect(y))).Length;
+foreach (var g in ReadCases()) {
+    total1 += string.Concat(g).Distinct().Count();
+    total2 += g.Aggregate ((x, y) => string.Concat(x.Intersect(y))).Length;
 }
 
 total1.Dump("Part 1");

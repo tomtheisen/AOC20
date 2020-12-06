@@ -643,8 +643,13 @@ public class PriorityQueue<T> {
 
 static string ReadString() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
-	return File.ReadAllText(filename);
+	return File.ReadAllText(filename).Replace("\r", "");
 }
+
+static string[][] ReadCases() =>
+    Regex.Split(ReadString(), @"\n\n+")
+        .Select(r => r.Split('\n'))
+        .ToArray();
 
 static string[] ReadLines() {
 	string filename = Util.CurrentQueryPath.Replace(".linq", ".txt");
