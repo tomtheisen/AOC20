@@ -10,6 +10,11 @@
 #nullable enable
 
 void Main() {
+	var bigBoard = new Board(100, 100);
+	for (int i = 0; i < 100; i++) for (int j = 0; j < 100; j++)
+		bigBoard = bigBoard.With(i, j, 'x');
+	bigBoard.Dump();
+
 	"foobar".BatchBy(3).Transpose().Dump("batch", 0);
 	Permutations("abcd".ToArray()).Select(x => string.Concat(x)).Dump("permutations", 0);
 	Choose("abcde", 2).Select(x => string.Concat(x)).Dump("choose", 0);
@@ -163,6 +168,8 @@ struct Position : IEquatable<Position> {
 }
 
 class Board : IEnumerable<Position> {
+	private const int MaxDepth = 500;
+
 	public int Width { get; }
 	public int Height { get; }
 	public int Left { get; }
@@ -175,6 +182,7 @@ class Board : IEnumerable<Position> {
 	private Position? ChangedPosition;
 	private char? NewChar;
 	private int Misses = 0;
+	private int Depth = 0;
 	
 	public Board(char[,] cells) {
 		Cells = cells;
@@ -201,6 +209,9 @@ class Board : IEnumerable<Position> {
 		Width = Max(oldBoard.Right, changedPosition.X + 1) - Left;
 		Height = Max(oldBoard.Bottom, changedPosition.Y + 1) - Top;
 		(ChangedPosition, NewChar) = (changedPosition, newChar);
+		
+		Depth = oldBoard.Depth + 1;
+		if (Depth > MaxDepth) this.Materialize();
 	}
 	
 	public Board(string cells) : this(Regex.Split(cells.TrimEnd('\r', '\n'), @"\r?\n")) { }
@@ -265,9 +276,9 @@ class Board : IEnumerable<Position> {
 	public bool Contains(Position p) => Contains(p.X, p.Y);
 	public bool Contains(int x, int y) => x >= Left && x < Right && y >= Top && y < Bottom;
 
-	public Board With(int x, int y, char c) => new Board(this, new Position(x, y), c);
+	public Board With(int x, int y, char c) => this.With(new Position(x, y), c);
 
-	public Board With(Position p, char c) => With(p.X, p.Y, c);
+	public Board With(Position p, char c) => new Board(this, p, c);
 	
 	public Position Center() => new Position(Left + Right >> 1, Top + Bottom >> 1);
 
@@ -292,6 +303,13 @@ class Board : IEnumerable<Position> {
 	}
 
 	public override string ToString() => $"Board ({Width} x {Height})";
+
+	public override bool Equals(object? obj) => obj is Board other 
+		&& other.Width == this.Width && other.Height == this.Height
+		&& this.All(pos => other[pos] == this[pos]);
+		
+	public static bool operator == (Board a, Board b) => a?.Equals(b) ?? false;
+	public static bool operator != (Board a, Board b) => !(a == b);
 }
 
 public class History<T> : IEnumerable<T> {
