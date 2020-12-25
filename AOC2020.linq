@@ -112,6 +112,8 @@ struct Direction : IEquatable<Direction> {
 	public void Deconstruct(out int dx, out int dy) => (dx, dy) = (DX, DY);
 	
 	public static Direction operator +(Direction a, Direction b) => new Direction(a.DX + b.DX, a.DY + b.DY);
+	public static Direction operator *(Direction a, int b) => new Direction(a.DX * b, a.DY * b);
+	public static Direction operator *(int a, Direction b) => b * a;
 	public static bool operator ==(Direction a, Direction b) => a.DX == b.DX && a.DY == b.DY;
 	public static bool operator !=(Direction a, Direction b) => !(a == b);
 	public override bool Equals(object? obj) => obj is Direction d && this == d;
