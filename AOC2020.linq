@@ -702,6 +702,10 @@ static int Hash(params object[] objects) {
 public static int GCD(int a, int b) => a == 0 ? Abs(b) : GCD(Abs(b) % a, Abs(a));
 public static long GCD(long a, long b) => a == 0 ? Abs(b) : GCD(Abs(b) % a, Abs(a));
 public static BigInteger GCD(BigInteger a, BigInteger b) => a == 0 ? BigInteger.Abs(b) : GCD(BigInteger.Abs(b) % a, BigInteger.Abs(a));
+public static int LCM(int a, int b) => checked(a * b / GCD(a, b));
+public static long LCM(long a, long b) => checked(a * b / GCD(a, b));
+public static BigInteger LCM(BigInteger a, BigInteger b) => a * b / GCD(a, b);
+
 
 public class ListComparer<T> : IEqualityComparer<IReadOnlyList<T>> {
 	public bool Equals(IReadOnlyList<T>? x, IReadOnlyList<T>? y)
